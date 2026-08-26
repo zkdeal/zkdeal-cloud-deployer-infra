@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "examples": [
+    {
+      "name": "public-health",
+      "method": "GET",
+      "path": "/hosting/v1/health",
+      "auth": "none",
+      "expectedStatus": 200
+    },
+    {
+      "name": "public-capabilities-json-rpc",
+      "method": "POST",
+      "path": "/hosting/v1/json-rpc",
+      "auth": "none",
+      "body": {
+        "jsonrpc": "2.0",
+        "id": "capabilities-1",
+        "method": "hosting_capabilities",
+        "params": {}
+      },
+      "expectedStatus": 200
+    },
+    {
+      "name": "protected-route-denies-anonymous",
+      "method": "GET",
+      "path": "/hosting/v1/protected",
+      "auth": "none",
+      "expectedStatus": 401
+    },
+    {
+      "name": "idempotent-reconcile",
+      "method": "POST",
+      "path": "/hosting/v1/admin/reconcile",
+      "auth": "bearer",
+      "body": { "roomId": "42" },
+      "mutation": true,
+      "idempotencyKey": "reconcile-room-42-fixture-v1",
+      "stableResponsePointers": ["/operationId"],
+      "expectedStatus": 202
+    }
+  ]
+}

@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["profile", "ownerCapabilities", "global", "storage", "components"],
+  "properties": {
+    "profile": { "enum": ["local", "staging", "production"] },
+    "ownerCapabilities": {
+      "type": "object",
+      "required": [
+        "hostedAdmissionLease", "hostedRoomBatchEnabled", "hostedEngineToBatchInputV5",
+        "hostedDurablePostgresQueue", "hostedExternalProver", "hostedRestartResume",
+        "hostedFixturePrepare", "hostedLegacyGroth16", "hostedIntegrationAcceptanceToken"
+      ],
+      "properties": {
+        "hostedAdmissionLease": { "type": "boolean" },
+        "hostedRoomBatchEnabled": { "type": "boolean" },
+        "hostedEngineToBatchInputV5": { "type": "boolean" },
+        "hostedDurablePostgresQueue": { "type": "boolean" },
+        "hostedExternalProver": { "type": "boolean" },
+        "hostedRestartResume": { "type": "boolean" },
+        "hostedFixturePrepare": { "type": "boolean" },
+        "hostedLegacyGroth16": { "type": "boolean" },
+        "hostedIntegrationAcceptanceToken": {
+          "type": "string",
+          "pattern": "^(?:|sha256:[0-9a-f]{64})$"
+        }
+      }
+    },
+    "global": {
+      "type": "object",
+      "required": ["existingSecret"],
+      "properties": { "existingSecret": { "type": "string", "minLength": 1 } }
+    },
+    "storage": {
+      "type": "object",
+      "required": ["backend", "fencing"],
+      "properties": {
+        "backend": { "enum": ["filesystem", "external-transactional"] },
+        "fencing": { "enum": ["none", "owner-service-transactional"] }
+      }
+    },
+    "operations": {
+      "type": "object",
+      "properties": {
+        "promotion": {
+          "type": "object",
+          "required": [
+            "enabled", "manualJobEnabled", "endpoint", "requiredReplayLsn", "databaseUrlSecretKey",
+            "idempotencyKeySecretKey", "principalTokenSecretKey", "activeDeadlineSeconds", "image", "controller", "provider"
+          ],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "manualJobEnabled": { "type": "boolean" },
+            "endpoint": { "type": "string" },
+            "requiredReplayLsn": { "type": "string" },
+            "databaseUrlSecretKey": { "type": "string", "minLength": 1 },
+            "idempotencyKeySecretKey": { "type": "string", "minLength": 1 },
+            "principalTokenSecretKey": { "type": "string", "minLength": 1 },
+            "activeDeadlineSeconds": { "type": "integer", "minimum": 1, "maximum": 300 },
+            "controller": {
+              "type": "object",
+              "required": [
+                "enabled", "armed", "image", "activeHealthUrls", "standbyHealthUrl",
+                "failoverProviderUrl", "candidateId", "failureThreshold", "pollSeconds",
+                "maxRtoSeconds", "maxCheckpointAgeSeconds", "requestTimeoutSeconds",
+                "providerTokenSecretKey", "approvalTokenSecretKey", "principalTokenSecretKey"
+              ],
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "armed": { "type": "boolean" },
+                "activeHealthUrls": {
+                  "type": "array", "items": { "type": "string", "format": "uri" },
+                  "minItems": 0, "maxItems": 32, "uniqueItems": true
+                },
+                "standbyHealthUrl": { "type": "string" },
+                "failoverProviderUrl": { "type": "string" },
+                "candidateId": { "type": "string" },
+                "failureThreshold": { "type": "integer", "minimum": 3, "maximum": 20 },
+                "pollSeconds": { "type": "integer", "minimum": 1, "maximum": 60 },
+                "maxRtoSeconds": { "type": "integer", "minimum": 30, "maximum": 300 },
+                "maxCheckpointAgeSeconds": { "type": "integer", "minimum": 1, "maximum": 300 },
+                "requestTimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 30 },
+                "providerTokenSecretKey": { "type": "string", "minLength": 1 },
+                "approvalTokenSecretKey": { "type": "string", "minLength": 1 },
+                "principalTokenSecretKey": { "type": "string", "minLength": 1 },
+                "image": {
+                  "type": "object",
+                  "required": ["repository", "digest", "pullPolicy"],
+                  "properties": {
+                    "repository": { "type": "string", "minLength": 1 },
+                    "digest": { "type": "string" },
+                    "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+                  }
+                }
+              }
+            },
+            "provider": {
+              "type": "object",
+              "required": [
+                "enabled", "platform", "image", "servicePort", "activeHealthUrls",
+                "standbyHealthUrl", "indexerFreshnessUrl", "stateClaimName", "tlsSecretName",
+                "tlsCertKey", "tlsPrivateKey", "providerTokenSecretKey", "approvalTokenSecretKey",
+                "platformTimeoutSeconds", "requestTimeoutSeconds", "primaryDatabaseStatefulSet",
+                "primaryDatabasePod", "standbyDatabasePod", "postgresContainer", "databaseService",
+                "applicationService", "signerAuthorityDeployment", "routeScopeLabelKey",
+                "routeScopeLabelValue", "routeLabelKey",
+                "standbyRouteValue", "pgUser", "pgDatabase", "pgData", "signerAuthority"
+              ],
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "platform": { "enum": ["kubernetes"] },
+                "servicePort": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+                "activeHealthUrls": {
+                  "type": "array", "items": { "type": "string", "format": "uri" },
+                  "minItems": 0, "maxItems": 32, "uniqueItems": true
+                },
+                "standbyHealthUrl": { "type": "string" },
+                "indexerFreshnessUrl": { "type": "string" },
+                "stateClaimName": { "type": "string" },
+                "tlsSecretName": { "type": "string" },
+                "tlsCertKey": { "type": "string", "minLength": 1 },
+                "tlsPrivateKey": { "type": "string", "minLength": 1 },
+                "providerTokenSecretKey": { "type": "string", "minLength": 1 },
+                "approvalTokenSecretKey": { "type": "string", "minLength": 1 },
+                "platformTimeoutSeconds": { "type": "integer", "minimum": 10, "maximum": 240 },
+                "requestTimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 30 },
+                "primaryDatabaseStatefulSet": { "type": "string" },
+                "primaryDatabasePod": { "type": "string" },
+                "standbyDatabasePod": { "type": "string" },
+                "postgresContainer": { "type": "string" },
+                "databaseService": { "type": "string" },
+                "applicationService": { "type": "string" },
+                "signerAuthorityDeployment": { "type": "string" },
+                "routeScopeLabelKey": { "type": "string" },
+                "routeScopeLabelValue": { "type": "string" },
+                "routeLabelKey": { "type": "string" },
+                "standbyRouteValue": { "type": "string" },
+                "pgUser": { "type": "string" },
+                "pgDatabase": { "type": "string" },
+                "pgData": { "type": "string" },
+                "image": {
+                  "type": "object",
+                  "required": ["repository", "digest", "pullPolicy"],
+                  "properties": {
+                    "repository": { "type": "string", "minLength": 1 },
+                    "digest": { "type": "string" },
+                    "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+                  }
+                },
+                "signerAuthority": {
+                  "type": "object",
+                  "required": ["enabled", "image"],
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "image": {
+                      "type": "object",
+                      "required": ["repository", "digest", "pullPolicy"],
+                      "properties": {
+                        "repository": { "type": "string", "minLength": 1 },
+                        "digest": { "type": "string" },
+                        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "image": {
+              "type": "object",
+              "required": ["repository", "digest", "pullPolicy"],
+              "properties": {
+                "repository": { "type": "string", "minLength": 1 },
+                "digest": { "type": "string" },
+                "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "not": {
+        "anyOf": [
+          { "required": ["tenantApi"] },
+          { "required": ["sponsorship"] },
+          { "required": ["finalityOracle"] },
+          { "required": ["providerPayout"] }
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["enabled", "image", "replicas", "port", "healthPath", "readinessPath", "role", "runtimeIdentity"],
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "replicas": { "type": "integer", "minimum": 0 },
+          "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "healthPath": { "type": "string", "pattern": "^/" },
+          "readinessPath": { "type": "string", "pattern": "^/" },
+          "runtimeIdentity": {
+            "type": "object",
+            "required": ["uid", "gid"],
+            "properties": {
+              "uid": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+              "gid": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+            },
+            "additionalProperties": false
+          },
+          "image": {
+            "type": "object",
+            "required": ["repository", "digest", "pullPolicy"],
+            "properties": {
+              "repository": {
+                "type": "string",
+                "minLength": 1,
+                "not": { "pattern": "zkdeal-hosting-services" }
+              },
+              "digest": { "type": "string" },
+              "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

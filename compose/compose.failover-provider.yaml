@@ -1,0 +1,166 @@
+# First-party single-daemon Docker/Compose failover adapter. This provides a
+# real synchronous PostgreSQL promotion drill, but does not claim host-loss
+# independence; multi-host/cloud drivers remain deployment-specific extensions.
+services:
+  postgres:
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - wal_keep_size=1024MB
+    environment:
+      REPLICATION_PASSWORD_FILE: /run/secrets/postgres-replication-password
+    volumes:
+      - ../failover-provider/postgres/primary-init.sh:/docker-entrypoint-initdb.d/20-zkdeal-replication.sh:ro
+      - ${POSTGRES_REPLICATION_PASSWORD_FILE:?set a scoped replication-password file}:/run/secrets/postgres-replication-password:ro
+    networks:
+      internal: { aliases: [postgres-writer] }
+
+  postgres-standby:
+    profiles: ["hosted", "promotion-provider"]
+    image: ${POSTGRES_IMAGE:-postgres:17.6-alpine}
+    entrypoint: ["/bin/sh", "/opt/zkdeal/standby-entrypoint.sh"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zkdeal}
+      POSTGRES_USER: ${POSTGRES_USER:-zkdeal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a local PostgreSQL password}
+      PGDATA: /var/lib/postgresql/data
+      PRIMARY_HOST: postgres
+      REPLICATION_SLOT: zkdeal_standby
+      PGAPPNAME: zkdeal_standby
+      REPLICATION_PASSWORD_FILE: /run/secrets/postgres-replication-password
+    volumes:
+      - type: bind
+        source: ${ZKDEAL_STATE_DIR:-../.state/local}/postgres-standby
+        target: /var/lib/postgresql/data
+      - ../failover-provider/postgres/standby-entrypoint.sh:/opt/zkdeal/standby-entrypoint.sh:ro
+      - ${POSTGRES_REPLICATION_PASSWORD_FILE:?set a scoped replication-password file}:/run/secrets/postgres-replication-password:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} && test \"$$(psql -U $${POSTGRES_USER} -d $${POSTGRES_DB} -tAc 'select pg_is_in_recovery()')\" = t"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"]
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    networks: [internal]
+
+  postgres-ha-ready:
+    profiles: ["hosted", "promotion-provider"]
+    image: ${POSTGRES_IMAGE:-postgres:17.6-alpine}
+    entrypoint: ["/bin/sh", "/opt/zkdeal/synchronous-ready.sh"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-zkdeal}
+      POSTGRES_USER: ${POSTGRES_USER:-zkdeal}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres-password
+    volumes:
+      - ../failover-provider/postgres/synchronous-ready.sh:/opt/zkdeal/synchronous-ready.sh:ro
+      - ${POSTGRES_PASSWORD_FILE:?set a scoped PostgreSQL password file}:/run/secrets/postgres-password:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      postgres-standby: { condition: service_healthy }
+    restart: "no"
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+
+  coordinator:
+    depends_on: !override
+      postgres-ha-ready: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
+
+  coordinator-standby:
+    depends_on: !override
+      postgres-ha-ready: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
+
+  # This proxy is deliberately created but left stopped by production_compose.py.
+  # The provider starts it only after the owner fence transfer, exposing each
+  # already-scoped Web3Signer role through a separate path.
+  standby-signer-authority:
+    profiles: ["promotion-provider"]
+    image: ${FRONT_DOOR_IMAGE:-nginx:1.27-alpine}
+    command: ["nginx", "-c", "/etc/nginx/nginx.conf", "-g", "daemon off;"]
+    user: "101:101"
+    volumes:
+      - ../failover-provider/nginx/signer-authority.conf:/etc/nginx/nginx.conf:ro
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m
+      - /var/cache/nginx:size=8m
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+
+  failover-provider-docker:
+    profiles: ["promotion-provider"]
+    image: ${FAILOVER_PROVIDER_IMAGE:-zkdeal-failover-provider:local}
+    build:
+      context: ..
+      dockerfile: failover-provider/Dockerfile
+    environment:
+      FAILOVER_PLATFORM: docker
+      ACTIVE_HEALTH_URLS: ${FAILOVER_PROVIDER_ACTIVE_HEALTH_URLS:?set two independent HTTPS active-health witnesses}
+      STANDBY_HEALTH_URL: http://coordinator-standby:3000/hosting/v1/health
+      INDEXER_FRESHNESS_URL: ${FAILOVER_PROVIDER_INDEXER_FRESHNESS_URL:?set the owner-advertised canonical indexer freshness URL}
+      SIGNER_AUTHORITY_HEALTH_URLS: http://standby-signer-authority:8080/health/operations,http://standby-signer-authority:8080/health/payout,http://standby-signer-authority:8080/health/finality,http://standby-signer-authority:8080/health/sponsor,http://standby-signer-authority:8080/health/withdrawal,http://standby-signer-authority:8080/health/blob
+      ACTIVE_COORDINATOR_ID: ${ACTIVE_COORDINATOR_ID:-compose-active-region}
+      STANDBY_COORDINATOR_ID: ${STANDBY_COORDINATOR_ID:-compose-standby-region}
+      FAILOVER_PROVIDER_TOKEN_FILE: /run/secrets/failover-provider-token
+      FAILOVER_APPROVAL_TOKEN_FILE: /run/secrets/failover-approval-token
+      FAILOVER_PROVIDER_TLS_CERT_FILE: /run/secrets/failover-provider-tls.crt
+      FAILOVER_PROVIDER_TLS_KEY_FILE: /run/secrets/failover-provider-tls.key
+      FAILOVER_PROVIDER_STATE_PATH: /var/lib/zkdeal-failover-provider/state.json
+      DOCKER_COMPOSE_PROJECT: zkdeal-cloud-local
+      DOCKER_FAILOVER_NETWORK: zkdeal-cloud-local_internal
+      DOCKER_ACTIVE_SERVICE: coordinator
+      DOCKER_STANDBY_SERVICE: coordinator-standby
+      DOCKER_PRIMARY_DB_SERVICE: postgres
+      DOCKER_STANDBY_DB_SERVICE: postgres-standby
+      DOCKER_SIGNER_SERVICE: standby-signer-authority
+      DOCKER_DATABASE_ALIAS: postgres-writer
+      DOCKER_APPLICATION_ALIAS: coordinator-writer
+      FAILOVER_PGUSER: ${POSTGRES_USER:-zkdeal}
+      FAILOVER_PGDATABASE: ${POSTGRES_DB:-zkdeal}
+      FAILOVER_PGDATA: /var/lib/postgresql/data
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${FAILOVER_PROVIDER_TOKEN_FILE:?set a scoped provider-token file}:/run/secrets/failover-provider-token:ro
+      - ${FAILOVER_APPROVAL_TOKEN_FILE:?set a distinct incident approval-token file}:/run/secrets/failover-approval-token:ro
+      - ${FAILOVER_PROVIDER_TLS_CERT_FILE:?set the provider TLS certificate file}:/run/secrets/failover-provider-tls.crt:ro
+      - ${FAILOVER_PROVIDER_TLS_KEY_FILE:?set the provider TLS key file}:/run/secrets/failover-provider-tls.key:ro
+      - failover-provider-state:/var/lib/zkdeal-failover-provider
+    group_add: ["${DOCKER_SOCKET_GID:-0}"]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal, egress]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl,urllib.request; urllib.request.urlopen('https://127.0.0.1:8443/ready',context=ssl._create_unverified_context(),timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  promotion-controller:
+    depends_on:
+      coordinator-standby: { condition: service_healthy }
+      failover-provider-docker: { condition: service_healthy }
+
+volumes:
+  failover-provider-state: {}

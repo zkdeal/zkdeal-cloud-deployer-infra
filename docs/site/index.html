@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>zkdeal operator reference</title>
+  <style>
+    body{font:16px/1.55 system-ui,sans-serif;max-width:860px;margin:4rem auto;padding:0 1.5rem;color:#18212b;background:#fbfcfe}
+    h1,h2{line-height:1.2} code{background:#eef2f6;padding:.15rem .35rem;border-radius:.25rem}
+    .boundary{border-left:5px solid #d4a900;padding:1rem 1.25rem;background:#fff9db}
+    a{color:#075baa} li{margin:.45rem 0}
+  </style>
+</head>
+<body>
+  <h1>zkdeal operator reference</h1>
+  <p class="boundary">This portal describes deployment integration. The API,
+  ABI, and trust-root summaries are generated from owner-project artifacts and
+  include their source hashes. It is not an independent protocol implementation.</p>
+  <h2>References</h2>
+  <ul>
+    <li><a href="guides/node-lifecycle.md">Provider node lifecycle</a></li>
+    <li><a href="guides/room-deployment-monitoring.md">Room deployment and monitoring</a></li>
+    <li><a href="guides/indexer-json-rpc.md">Indexer and hosted JSON-RPC</a></li>
+    <li><a href="guides/monitoring-runbooks.md">Metrics, dashboards, alerts and runbooks</a></li>
+    <li><a href="guides/contract-reference.md">Contract and event/indexer reference</a></li>
+    <li><a href="schemas/hosting-json-rpc.schema.json">Hosted JSON-RPC machine schema</a></li>
+    <li><a href="reference/api.md">Generated owner API reference, schemas, examples and source hashes</a></li>
+    <li><a href="reference/headless-room-node-capabilities.reference.json">Headless room-node capability snapshot</a></li>
+    <li><a href="reference/capacity-provider-v1.openapi.reference.json">Capacity-provider v1 OpenAPI snapshot</a></li>
+    <li><a href="reference/abi.md">Contract ABI inventory</a></li>
+    <li><a href="reference/event-to-indexer.md">Generated event/call projection map</a></li>
+    <li><a href="reference/hosted-service-capabilities.reference.json">Owner capability snapshot</a></li>
+    <li><a href="reference/metric-catalog.json">Machine-readable metric catalog</a></li>
+    <li><a href="reference/manifest.json">Source and digest manifest</a></li>
+    <li><a href="runbooks/release-soak.md">Owner-driven release-soak protocol</a></li>
+    <li><a href="runbooks/warm-standby-promotion.md">Warm-standby promotion</a></li>
+    <li><a href="runbooks/post-finality-surprise.md">Post-finality surprise incident</a></li>
+    <li><a href="runbooks/database-restore.md">PostgreSQL and object restore drill</a></li>
+    <li><a href="runbooks/object-store-loss.md">Object-store loss recovery</a></li>
+    <li><a href="runbooks/pre-finality-reorg.md">Ordinary pre-finality reorg</a></li>
+    <li><a href="runbooks/hosted-queue-stall.md">Hosted queue stall</a></li>
+    <li><a href="runbooks/deadline-risk.md">Canonical deadline risk</a></li>
+    <li><a href="runbooks/signer-rotation.md">Remote signer rotation</a></li>
+  </ul>
+  <h2>Operator gates</h2>
+  <ul>
+    <li>Use digest-pinned images for production.</li>
+    <li>Use the negotiated PostgreSQL schema from the current owner capability manifest and transactional fencing for hosted authority.</li>
+    <li>Bind indexer/reconciler leases to the active coordinator epoch and roll them after promotion.</li>
+    <li>Keep every service command absent from the current owner capability manifest disabled.</li>
+    <li>Supply TLS, independently operated RPC endpoints, and managed secrets.</li>
+    <li>Run smoke, soak, backup/restore, and evidence collection before traffic.</li>
+  </ul>
+</body>
+</html>

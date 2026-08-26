@@ -1,0 +1,22 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    { "type": "stat", "title": "Headless room-node ready", "targets": [{ "expr": "min(zkdeal_room_node_ready)", "refId": "A" }], "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 } },
+    { "type": "stat", "title": "Headless room-node connected", "targets": [{ "expr": "min(zkdeal_room_node_connected)", "refId": "A" }], "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 } },
+    { "type": "timeseries", "title": "Verified local blocks", "targets": [{ "expr": "zkdeal_room_node_blocks", "refId": "A" }], "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 } },
+    { "type": "timeseries", "title": "Verified restores", "targets": [{ "expr": "increase(zkdeal_room_node_restores_total[1h])", "refId": "A" }], "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 } },
+    { "type": "timeseries", "title": "Control operations by bounded outcome", "targets": [{ "expr": "sum by (operation, status) (rate(zkdeal_room_node_control_operations_total[5m]))", "refId": "A" }], "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 } },
+    { "type": "timeseries", "title": "L1 finality state", "targets": [{ "expr": "sum by (state) (zkdeal_room_node_l1_finality)", "refId": "A" }], "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 } },
+    { "type": "timeseries", "title": "Rooms by bounded lifecycle state (remaining owner contract)", "targets": [{ "expr": "sum by (state) (zkdeal_rooms_by_state)", "refId": "A" }], "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 } },
+    { "type": "timeseries", "title": "Room deadline budget (remaining owner contract)", "targets": [{ "expr": "histogram_quantile(0.05, sum by (le, deadline_class) (rate(zkdeal_room_deadline_seconds_bucket[5m])))", "refId": "A" }], "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 } }
+  ],
+  "schemaVersion": 41,
+  "tags": ["zkdeal", "rooms", "owner-published", "owner-contract-required"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "zkdeal room lifecycle and deadlines",
+  "uid": "zkdeal-room",
+  "version": 2
+}

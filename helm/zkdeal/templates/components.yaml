@@ -1,0 +1,288 @@
+{{- range $name, $component := .Values.components }}
+{{- if $component.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $name }}
+  labels:
+    {{- include "zkdeal.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ kebabcase $name }}
+spec:
+  replicas: {{ $component.replicas }}
+  strategy:
+    {{- if or (eq $component.role "active") (eq $component.role "indexer") (eq $component.role "reconciler") (eq $component.role "publisher") (eq $component.role "auto-claimer") (eq $component.role "capacity-controller") }}
+    # Fenced writer/delegated-worker identities must never overlap during a rollout.
+    type: Recreate
+    {{- else }}
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+    {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ kebabcase $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "zkdeal.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ kebabcase $name }}
+        {{- if eq $component.role "active" }}
+        zkdeal.io/failover-target: active
+        {{- else if eq $component.role "standby" }}
+        zkdeal.io/failover-target: standby
+        {{- end }}
+      annotations:
+        checksum/runtime-secret-name: {{ $.Values.global.existingSecret | sha256sum }}
+        {{- with $.Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "zkdeal.serviceAccountName" $ }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ $component.runtimeIdentity.uid }}
+        runAsGroup: {{ $component.runtimeIdentity.gid }}
+        fsGroup: {{ $component.runtimeIdentity.gid }}
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ $.Release.Name }}
+              app.kubernetes.io/component: {{ kebabcase $name }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: {{ $.Release.Name }}
+                    app.kubernetes.io/component: {{ kebabcase $name }}
+      {{- with $.Values.global.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if eq $component.role "headless" }}
+      initContainers:
+        - name: prepare-room-node-secrets
+          image: {{ include "zkdeal.image" $component.image | quote }}
+          imagePullPolicy: {{ $component.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              umask 077;
+              cp /run/zkdeal-secret-source/keys.json /run/zkdeal-secrets/keys.json;
+              cp /run/zkdeal-secret-source/control.token /run/zkdeal-secrets/control.token;
+              chmod 0600 /run/zkdeal-secrets/keys.json /run/zkdeal-secrets/control.token
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: room-node-secret-source, mountPath: /run/zkdeal-secret-source, readOnly: true }
+            - { name: room-node-secrets, mountPath: /run/zkdeal-secrets }
+      {{- end }}
+      containers:
+        - name: {{ kebabcase $name }}
+          image: {{ include "zkdeal.image" $component.image | quote }}
+          imagePullPolicy: {{ $component.image.pullPolicy }}
+          {{- with $component.command }}
+          command: {{ toJson . }}
+          {{- end }}
+          {{- if $component.workingDir }}
+          workingDir: {{ $component.workingDir }}
+          {{- end }}
+          securityContext:
+            runAsUser: {{ $component.runtimeIdentity.uid }}
+            runAsGroup: {{ $component.runtimeIdentity.gid }}
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          {{- if ne $component.role "prover-agent" }}
+          ports:
+            - name: http
+              containerPort: {{ $component.port }}
+          {{- end }}
+          env:
+            {{- if ne $component.role "prover-agent" }}
+            - { name: PORT, value: {{ $component.port | quote }} }
+            - { name: HOST, value: "0.0.0.0" }
+            {{- end }}
+            {{- if $component.injectChain }}
+            - { name: CHAIN_ID, value: {{ $.Values.chain.id | quote }} }
+            - { name: L1_RPC_URL, value: {{ first (splitList "," $.Values.chain.rpcUrls) | quote }} }
+            - { name: L1_RPC_URLS, value: {{ $.Values.chain.rpcUrls | quote }} }
+            - { name: L1_RPC_PROVIDER_IDS, value: {{ $.Values.chain.rpcProviderIds | quote }} }
+            - { name: ROOM_MANAGER, value: {{ $.Values.chain.roomManager | quote }} }
+            - { name: ROOM_POOL, value: {{ $.Values.chain.roomPool | quote }} }
+            - { name: ACCESS_TOKEN, value: {{ $.Values.chain.accessToken | quote }} }
+            - { name: BEACON_SIDECAR_URLS, value: {{ $.Values.chain.beaconSidecarUrls | quote }} }
+            {{- end }}
+            {{- if eq $component.role "active" }}
+            - { name: COORDINATOR_ROLE, value: {{ $component.role | quote }} }
+            - { name: COORDINATOR_ID, value: {{ $.Values.availability.activeCoordinatorId | quote }} }
+            {{- if (index $.Values.externalServices.signerRoles "liveness").address }}
+            - { name: NODE_LIVENESS_SIGNER_URL, value: {{ (index $.Values.externalServices.signerRoles "liveness").address | quote }} }
+            - { name: NODE_LIVENESS_SIGNER_ADDRESS, value: {{ (index $.Values.externalServices.signerRoles "liveness").signerAddress | quote }} }
+            {{- end }}
+            {{- else if eq $component.role "standby" }}
+            - { name: COORDINATOR_ROLE, value: {{ $component.role | quote }} }
+            - { name: COORDINATOR_ID, value: {{ $.Values.availability.standbyCoordinatorId | quote }} }
+            {{- else if or (eq $component.role "indexer") (eq $component.role "reconciler") (eq $component.role "publisher") (eq $component.role "auto-claimer") (eq $component.role "capacity-controller") }}
+            - { name: COORDINATOR_ID, value: {{ $.Values.availability.activeCoordinatorId | quote }} }
+            - name: HOSTED_WORKER_ID
+              valueFrom: { fieldRef: { fieldPath: metadata.uid } }
+            {{- end }}
+            {{- if and $component.hostedRuntime (eq $.Values.storage.backend "external-transactional") }}
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ $.Values.global.existingSecret }}, key: {{ $.Values.storage.databaseSecretKey }} } }
+            - name: API_KEY_PEPPER
+              valueFrom: { secretKeyRef: { name: {{ $.Values.global.existingSecret }}, key: {{ $.Values.storage.apiKeyPepperSecretKey }} } }
+            - name: OBJECT_STORE_ENDPOINT
+              valueFrom: { secretKeyRef: { name: {{ $.Values.global.existingSecret }}, key: {{ $.Values.storage.objectStoreEndpointSecretKey }} } }
+            - name: OBJECT_STORE_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: {{ $.Values.global.existingSecret }}, key: {{ $.Values.storage.objectStoreAccessKeySecretKey }} } }
+            - name: OBJECT_STORE_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: {{ $.Values.global.existingSecret }}, key: {{ $.Values.storage.objectStoreSecretKey }} } }
+            - { name: OBJECT_STORE_BUCKET, value: {{ $.Values.storage.objectStoreBucket | quote }} }
+            - { name: OBJECT_STORE_REGION, value: {{ $.Values.storage.objectStoreRegion | quote }} }
+            - { name: OBJECT_STORE_PREFIX, value: {{ $.Values.storage.objectStorePrefix | quote }} }
+            {{- end }}
+            {{- if eq $component.role "publisher" }}
+            - { name: L1_SIGNER_URL, value: {{ (index $.Values.externalServices.signerRoles $component.signerRole).address | quote }} }
+            - { name: L1_SIGNER_ADDRESS, value: {{ (index $.Values.externalServices.signerRoles $component.signerRole).signerAddress | quote }} }
+            {{- else if eq $component.role "auto-claimer" }}
+            - { name: WITHDRAWAL_SIGNER_URL, value: {{ (index $.Values.externalServices.signerRoles $component.signerRole).address | quote }} }
+            - { name: WITHDRAWAL_SIGNER_ADDRESS, value: {{ (index $.Values.externalServices.signerRoles $component.signerRole).signerAddress | quote }} }
+            {{- else if eq $component.role "prover-agent" }}
+            - { name: ROOM_POOL, value: {{ $.Values.chain.roomPool | quote }} }
+            - { name: L1_CHAIN_ID, value: {{ $.Values.chain.id | quote }} }
+            {{- else if $component.signerRole }}
+            - { name: SIGNER_ROLE, value: {{ $component.signerRole | quote }} }
+            - { name: SIGNER_URL, value: {{ (index $.Values.externalServices.signerRoles $component.signerRole).address | quote }} }
+            {{- end }}
+            {{- range $envName, $envValue := $component.env }}
+            - { name: {{ $envName }}, value: {{ $envValue | quote }} }
+            {{- end }}
+            {{- range $envName, $secretKey := $component.secretEnv }}
+            - name: {{ $envName }}
+              valueFrom: { secretKeyRef: { name: {{ $.Values.global.existingSecret }}, key: {{ $secretKey }} } }
+            {{- end }}
+          {{- if eq $component.role "prover-agent" }}
+          livenessProbe:
+            exec: { command: {{ toJson $component.livenessCommand }} }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec: { command: {{ toJson $component.readinessCommand }} }
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          {{- else }}
+          livenessProbe:
+            httpGet: { path: {{ $component.healthPath }}, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            httpGet: { path: {{ $component.readinessPath }}, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+          {{- end }}
+          resources: {{ toYaml $component.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            {{- if eq $component.role "headless" }}
+            - { name: room-node-config, mountPath: /run/zkdeal/room-node.json, subPath: room-node.json, readOnly: true }
+            - { name: room-node-secrets, mountPath: /run/zkdeal-secrets, readOnly: true }
+            - { name: room-node-artifacts, mountPath: /opt/zkdeal/artifacts, readOnly: true }
+            {{- end }}
+            {{- if $component.persistence.enabled }}
+            - { name: data, mountPath: {{ ternary "/var/lib/zkdeal-room-node" "/var/lib/zkdeal" (eq $component.role "headless") }} }
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+        {{- if eq $component.role "headless" }}
+        - name: room-node-config
+          configMap:
+            name: {{ $component.roomNode.configMapName }}
+            items: [{ key: {{ $component.roomNode.configKey }}, path: room-node.json }]
+        - name: room-node-secret-source
+          secret:
+            secretName: {{ $component.roomNode.secretName }}
+            defaultMode: 0444
+            items:
+              - { key: {{ $component.roomNode.keyFileKey }}, path: keys.json }
+              - { key: {{ $component.roomNode.controlTokenKey }}, path: control.token }
+        - name: room-node-secrets
+          emptyDir: { sizeLimit: 1Mi }
+        - name: room-node-artifacts
+          persistentVolumeClaim: { claimName: {{ $component.roomNode.artifactClaimName }}, readOnly: true }
+        {{- end }}
+        {{- if $component.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim: { claimName: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $name }} }
+        {{- end }}
+{{- if ne $component.role "prover-agent" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $name }}
+  labels:
+    {{- include "zkdeal.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ kebabcase $name }}
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ kebabcase $name }}
+  ports:
+    - { name: http, port: {{ $component.port }}, targetPort: http }
+{{- end }}
+{{- if $component.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $name }}
+  labels: {{ include "zkdeal.labels" $ | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- if $component.persistence.storageClass }}
+  storageClassName: {{ $component.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests: { storage: {{ $component.persistence.size }} }
+{{- end }}
+{{- if and $.Values.podDisruptionBudget.enabled (or (gt (int $component.replicas) 1) (eq $component.role "active")) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $name }}
+spec:
+  minAvailable: {{ $.Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ kebabcase $name }}
+{{- end }}
+{{- end }}
+{{- end }}

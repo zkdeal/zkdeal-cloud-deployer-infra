@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "profile": "local",
+  "overrides": {
+    "coordinator": "zkdeal-coordinator:local",
+    "queue": "zkdeal-coordinator:local",
+    "indexer": "zkdeal-coordinator:local",
+    "reconciler": "zkdeal-coordinator:local",
+    "publisher": "zkdeal-coordinator:local",
+    "autoClaimer": "zkdeal-coordinator:local",
+    "capacityController": "zkdeal-coordinator:local",
+    "headlessRoomNode": "zkdeal-headless-room-node:local",
+    "agent": "zkdeal-prover-agent:local",
+    "prover": "zkdeal-risc0-cuda-runtime:local",
+    "docs": "zkdeal-operator-docs:local",
+    "frontDoor": "caddy:2.10-alpine",
+    "prometheus": "prom/prometheus:v3.5.0",
+    "grafana": "grafana/grafana:12.1.0",
+    "postgres": "postgres:17.6-alpine",
+    "minio": "minio/minio:RELEASE.2025-04-22T22-12-26Z",
+    "minioClient": "minio/mc:RELEASE.2025-04-16T18-13-26Z",
+    "openbao": "openbao/openbao:2.6.1",
+    "web3signer": "consensys/web3signer:26.4.2-distroless",
+    "alertmanager": "prom/alertmanager:v0.28.1",
+    "loki": "grafana/loki:3.5.3",
+    "promtail": "grafana/promtail:3.5.3"
+  },
+  "warning": "Tag overrides are permitted only by non-production profiles."
+}

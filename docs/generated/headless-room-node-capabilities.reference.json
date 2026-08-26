@@ -1,0 +1,96 @@
+{
+  "entrypoint": {
+    "capabilities": "/capabilities",
+    "command": [
+      "node",
+      "dist/cli.js",
+      "run"
+    ],
+    "configEnvironment": "ROOM_NODE_CONFIG_PATH",
+    "health": "/health",
+    "metrics": "/metrics",
+    "port": 3100,
+    "readiness": "/ready"
+  },
+  "image": {
+    "builderBase": "node:22-bookworm@sha256:0557ac14e0d45d02ed563067b82856ca5e7aa3437fa28d98d4350ea9c3d9494a",
+    "context": ".",
+    "dockerfile": "app-node/packages/room-node/Dockerfile",
+    "runtimeBase": "node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436"
+  },
+  "keyCustody": {
+    "hostedL1TransactionKey": false,
+    "hostedScopedCredentials": [
+      "room-operator",
+      "l1-room-submit",
+      "job-submit",
+      "job-read"
+    ],
+    "privateKeyEnvironment": false,
+    "privateKeysExcludedFromState": true,
+    "source": "operator-mounted-0600-files"
+  },
+  "modes": {
+    "hosted": {
+      "admissions": {
+        "ack": "/hosting/v1/admissions/:roomId/ack",
+        "durableContiguousPrefix": true,
+        "lease": "/hosting/v1/admissions/:roomId/lease"
+      },
+      "authorizationModes": [
+        "VALIDITY_ONLY"
+      ],
+      "fixturePrepare": false,
+      "l1": {
+        "directSender": false,
+        "durableNonceSignerWatcher": true,
+        "operation": "RoomManager.submitBatch",
+        "requireFinalized": true,
+        "status": "/hosting/v1/l1-transactions/:operationId",
+        "submit": "/hosting/v1/l1-operations/room-batches"
+      },
+      "legacyGroth16Checkpoint": false,
+      "production": true,
+      "proofQueue": {
+        "contentDigestVerified": true,
+        "endpoints": [
+          "/hosting/v1/rooms/prepare-batch",
+          "/v5/rooms/prove",
+          "/v5/rooms/verify"
+        ],
+        "gpuOnlyStage": "/v5/rooms/prove",
+        "result": "/queue/v1/jobs/:jobId/result",
+        "status": "/queue/v1/jobs/:jobId",
+        "submit": "/queue/v1/jobs",
+        "transport": "remote-postgresql-minio"
+      },
+      "provingContext": "/hosting/v1/rooms/:roomId/proving-context",
+      "unanimousMode": {
+        "reason": "The live engine artifact does not contain the complete on-chain approver roster and signatures; hosted preparation refuses the room instead of manufacturing approvals.",
+        "supported": false
+      }
+    },
+    "standalone-loopback-dev": {
+      "directL1Wallet": true,
+      "implicitDirectSenderDefault": false,
+      "legacyGroth16Checkpoint": true,
+      "localGroth16Artifacts": true,
+      "loopbackL1RpcRequired": true,
+      "production": false
+    }
+  },
+  "restartSafety": {
+    "authenticatedStateDigests": true,
+    "checksummedAtomicClientState": true,
+    "checksummedAtomicHostedLifecycle": true,
+    "correlationAndIdempotencyPersisted": true,
+    "exclusiveStateLock": true,
+    "hostedLifecycleDigest": true,
+    "ownerOperationIdPersisted": true,
+    "privateKeysExcludedFromState": true,
+    "queueJobAndResultDigestsPersisted": true,
+    "stateEndpointReportsExclusiveLock": true
+  },
+  "schemaVersion": 1,
+  "service": "zkdeal-headless-room-node"
+}

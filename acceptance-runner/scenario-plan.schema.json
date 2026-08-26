@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zkdeal.local/schemas/acceptance-scenario-plan-v1.json",
+  "title": "zkdeal owner acceptance scenario plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "candidateId", "hostedIntegrationToken", "ownerDatabaseSchema", "authTokenSha256", "scenarios"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "candidateId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{7,79}$" },
+    "hostedIntegrationToken": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "ownerDatabaseSchema": { "type": "integer", "minimum": 1 },
+    "authTokenSha256": {
+      "type": "object",
+      "propertyNames": {
+        "enum": ["admin", "tenant_a", "tenant_b", "node_a", "node_b", "l1_liveness", "l1_room", "l1_aggregate", "l1_sponsor", "withdrawal", "fault_control", "backup_restore", "failover_control", "failover_approval"]
+      },
+      "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "scenarios": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/scenario" }
+    }
+  },
+  "$defs": {
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["steps", "evidence"],
+      "properties": {
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/step" }
+        },
+        "evidence": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/evidenceRef" }
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "endpoint", "method", "path", "expectStatus"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$" },
+        "endpoint": {
+          "enum": ["coordinator", "indexer", "queue", "headless", "rpc_a", "rpc_b", "fault", "backup", "failover", "prover", "logs"]
+        },
+        "method": { "enum": ["GET", "POST", "PUT", "DELETE"] },
+        "path": { "type": "string", "pattern": "^/[^\\s]*$" },
+        "auth": {
+          "enum": ["admin", "tenant_a", "tenant_b", "node_a", "node_b", "l1_liveness", "l1_room", "l1_aggregate", "l1_sponsor", "withdrawal", "fault_control", "backup_restore", "failover_control", "failover_approval"]
+        },
+        "approvalAuth": { "const": "failover_approval" },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "maxLength": 256 }
+        },
+        "body": {},
+        "expectStatus": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 100, "maximum": 599 }
+        },
+        "attempts": { "type": "integer", "minimum": 1, "maximum": 600 },
+        "intervalMs": { "type": "integer", "minimum": 0, "maximum": 10000 }
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "pointer"],
+      "properties": {
+        "step": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$" },
+        "pointer": { "type": "string", "pattern": "^(|/.*)$" }
+      }
+    }
+  }
+}

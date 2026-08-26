@@ -1,0 +1,59 @@
+{{- if and .Values.operations.promotion.enabled .Values.operations.promotion.manualJobEnabled }}
+{{- if not .Values.operations.promotion.endpoint }}{{ fail "promotion requires an owner-advertised operations.promotion.endpoint" }}{{ end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-promotion-gate
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+data:
+  promotion_gate.sh: |
+{{ .Files.Get "files/promotion_gate.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-promote-standby
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ .Values.operations.promotion.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "zkdeal.labels" . | nindent 8 }}
+        app.kubernetes.io/component: promotion
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: promote
+          image: {{ include "zkdeal.image" .Values.operations.promotion.image | quote }}
+          command: ["/bin/sh", "/opt/zkdeal/promotion_gate.sh"]
+          env:
+            - { name: PROMOTION_ENDPOINT, value: {{ .Values.operations.promotion.endpoint | quote }} }
+            - { name: PROMOTION_REQUIRED_REPLAY_LSN, value: {{ .Values.operations.promotion.requiredReplayLsn | quote }} }
+            - { name: PROMOTION_STANDBY_COORDINATOR_ID, value: {{ .Values.availability.standbyCoordinatorId | quote }} }
+            - name: PROMOTION_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.promotion.databaseUrlSecretKey }} } }
+            - name: PROMOTION_IDEMPOTENCY_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.promotion.idempotencyKeySecretKey }} } }
+            - name: PROMOTION_PRINCIPAL_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.promotion.principalTokenSecretKey }} } }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: promotion-gate, mountPath: /opt/zkdeal/promotion_gate.sh, subPath: promotion_gate.sh, readOnly: true }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 16Mi }
+        - name: promotion-gate
+          configMap: { name: {{ include "zkdeal.fullname" . }}-promotion-gate, defaultMode: 0444 }
+{{- end }}

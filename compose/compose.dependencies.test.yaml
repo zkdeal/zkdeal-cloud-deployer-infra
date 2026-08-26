@@ -1,0 +1,12 @@
+services:
+  postgres:
+    volumes: !override
+      - dependency-postgres:/var/lib/postgresql/data
+  minio:
+    volumes: !override
+      - dependency-minio:/data
+
+volumes:
+  dependency-postgres: {}
+  dependency-minio: {}
+

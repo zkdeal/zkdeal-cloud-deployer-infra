@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "cardinalityPolicy": {
+    "forbiddenLabels": ["tenant_id", "tenantId", "room_id", "roomId", "job_id", "jobId", "principal_id", "principalId", "transaction_hash"],
+    "maximumBoundedValuesPerLabel": 64
+  },
+  "domains": {
+    "l1-finality": {
+      "dashboard": "l1-finality.json",
+      "metrics": [
+        {"name":"zkdeal_l1_quorum_healthy","type":"gauge","unit":"boolean","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_l1_reorgs_total","type":"counter","unit":"reorgs","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_finality_undercuts_total","type":"counter","unit":"events","labels":[],"status":"required-owner-contract"},
+        {"name":"zkdeal_l1_post_finality_surprises_total","type":"counter","unit":"events","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_deadline_risk_jobs","type":"gauge","unit":"jobs","labels":["service_class"],"status":"owner-published"}
+      ]
+    },
+    "indexer": {
+      "dashboard": "indexer.json",
+      "metrics": [
+        {"name":"zkdeal_hosted_worker_up","type":"gauge","unit":"boolean","labels":["job"],"status":"owner-published"},
+        {"name":"zkdeal_hosted_worker_running","type":"gauge","unit":"boolean","labels":["job"],"status":"owner-published"},
+        {"name":"zkdeal_hosted_worker_completed_runs_total","type":"counter","unit":"runs","labels":["job"],"status":"owner-published"},
+        {"name":"zkdeal_hosted_worker_processed_blocks_total","type":"counter","unit":"blocks","labels":["job"],"status":"owner-published"},
+        {"name":"zkdeal_hosted_worker_reconciled_rooms_total","type":"counter","unit":"rooms","labels":["job"],"status":"owner-published"},
+        {"name":"zkdeal_hosted_worker_last_success_timestamp_seconds","type":"gauge","unit":"unix-seconds","labels":["job"],"status":"owner-published"},
+        {"name":"zkdeal_indexer_lag_blocks","type":"gauge","unit":"blocks","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_indexer_retractions_total","type":"counter","unit":"events","labels":["reason"],"status":"owner-published"}
+      ]
+    },
+    "wal-admission": {
+      "dashboard": "wal-admission.json",
+      "metrics": [
+        {"name":"zkdeal_admission_wal_records","type":"gauge","unit":"records","labels":["status"],"status":"owner-published"},
+        {"name":"zkdeal_admission_wal_recovered_total","type":"counter","unit":"records","labels":["outcome"],"status":"owner-published"}
+      ]
+    },
+    "room": {
+      "dashboard": "room.json",
+      "metrics": [
+        {"name":"zkdeal_room_node_up","type":"gauge","unit":"boolean","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_room_node_ready","type":"gauge","unit":"boolean","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_room_node_connected","type":"gauge","unit":"boolean","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_room_node_blocks","type":"gauge","unit":"blocks","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_room_node_state_transitions_total","type":"counter","unit":"transitions","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_room_node_restores_total","type":"counter","unit":"restores","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_room_node_hosted_pending_batches","type":"gauge","unit":"batches","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_room_node_hosted_admission_healthy","type":"gauge","unit":"boolean","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_room_node_control_operations_total","type":"counter","unit":"operations","labels":["operation","status"],"status":"owner-published"},
+        {"name":"zkdeal_room_node_l1_finality","type":"gauge","unit":"boolean","labels":["state"],"status":"owner-published"},
+        {"name":"zkdeal_rooms_by_state","type":"gauge","unit":"rooms","labels":["state"],"status":"required-owner-contract"},
+        {"name":"zkdeal_room_deadline_seconds","type":"histogram","unit":"seconds","labels":["deadline_class"],"status":"required-owner-contract"},
+        {"name":"zkdeal_rooms_waiting_for_node","type":"gauge","unit":"rooms","labels":[],"status":"required-owner-contract"}
+      ]
+    },
+    "proving-queue": {
+      "dashboard": "proving-queue.json",
+      "metrics": [
+        {"name":"zkdeal_queue_jobs_waiting","type":"gauge","unit":"jobs","labels":[],"status":"standalone-only"},
+        {"name":"zkdeal_queue_oldest_waiting_age_seconds","type":"gauge","unit":"seconds","labels":[],"status":"standalone-only"},
+        {"name":"zkdeal_queue_leases_expired_total","type":"counter","unit":"leases","labels":[],"status":"standalone-only"},
+        {"name":"zkdeal_hosted_queue_jobs_waiting","type":"gauge","unit":"jobs","labels":["service_class","partition"],"status":"required-owner-contract"},
+        {"name":"zkdeal_prover_uptime_seconds","type":"gauge","unit":"seconds","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_prover_requests_total","type":"counter","unit":"requests","labels":["route","outcome"],"status":"owner-published"},
+        {"name":"zkdeal_prover_gpu_utilization_percent","type":"gauge","unit":"percent","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_prover_gpu_memory_used_mib","type":"gauge","unit":"mebibytes","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_prover_gpu_power_watts","type":"gauge","unit":"watts","labels":[],"status":"owner-published"}
+      ]
+    },
+    "tenant-billing": {
+      "dashboard": "tenant-billing.json",
+      "metrics": [
+        {"name":"zkdeal_tenant_usage_ledger_lag_seconds","type":"gauge","unit":"seconds","labels":["tier"],"status":"required-owner-contract"},
+        {"name":"zkdeal_metering_reconciliation_failures_total","type":"counter","unit":"failures","labels":["unit"],"status":"required-owner-contract"}
+      ]
+    },
+    "storage": {
+      "dashboard": "storage.json",
+      "metrics": [
+        {"name":"zkdeal_postgres_wal_replay_lag_seconds","type":"gauge","unit":"seconds","labels":["region"],"status":"required-owner-contract"},
+        {"name":"zkdeal_object_archive_failures_total","type":"counter","unit":"failures","labels":["operation"],"status":"required-owner-contract"},
+        {"name":"zkdeal_backup_last_success_timestamp_seconds","type":"gauge","unit":"unix-seconds","labels":["backup_class"],"status":"required-owner-contract"}
+      ]
+    },
+    "sponsorship": {
+      "dashboard": "sponsorship.json",
+      "metrics": [
+        {"name":"zkdeal_sponsorship_balance_wei","type":"gauge","unit":"wei","labels":["sponsor_class"],"status":"required-owner-contract"},
+        {"name":"zkdeal_sponsorship_denials_total","type":"counter","unit":"denials","labels":["reason"],"status":"owner-published"}
+      ]
+    },
+    "blob": {
+      "dashboard": "blob.json",
+      "metrics": [
+        {"name":"zkdeal_blob_publisher_up","type":"gauge","unit":"boolean","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_blob_publish_processed_total","type":"counter","unit":"operations","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_blob_publish_errors_total","type":"counter","unit":"errors","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_l1_post_finality_surprise_total","type":"counter","unit":"events","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_blob_publisher_completed_runs_total","type":"counter","unit":"runs","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_blob_publisher_last_success_timestamp_seconds","type":"gauge","unit":"unix-seconds","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_blob_archive_pending","type":"gauge","unit":"blobs","labels":[],"status":"required-owner-contract"},
+        {"name":"zkdeal_blob_archive_verification_failures_total","type":"counter","unit":"failures","labels":["reason"],"status":"required-owner-contract"}
+      ]
+    },
+    "withdrawal": {
+      "dashboard": "withdrawal.json",
+      "metrics": [
+        {"name":"zkdeal_withdrawal_worker_up","type":"gauge","unit":"boolean","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_withdrawal_claim_operations_total","type":"counter","unit":"operations","labels":["status"],"status":"owner-published"},
+        {"name":"zkdeal_withdrawal_worker_runs_total","type":"counter","unit":"runs","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_withdrawal_worker_last_success_timestamp_seconds","type":"gauge","unit":"unix-seconds","labels":[],"status":"owner-published"}
+      ]
+    },
+    "capacity": {
+      "dashboard": "capacity.json",
+      "metrics": [
+        {"name":"zkdeal_capacity_worker_up","type":"gauge","unit":"boolean","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_capacity_worker_running","type":"gauge","unit":"boolean","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_capacity_worker_runs_total","type":"counter","unit":"runs","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_capacity_operations_total","type":"counter","unit":"operations","labels":["status"],"status":"owner-published"},
+        {"name":"zkdeal_capacity_worker_last_success_timestamp_seconds","type":"gauge","unit":"unix-seconds","labels":[],"status":"owner-published"}
+      ]
+    },
+    "aggregate": {
+      "dashboard": "aggregate.json",
+      "metrics": [
+        {"name":"zkdeal_partial_aggregate_pending","type":"gauge","unit":"aggregates","labels":["proof_class"],"status":"required-owner-contract"},
+        {"name":"zkdeal_aggregate_failures_total","type":"counter","unit":"failures","labels":["reason"],"status":"required-owner-contract"}
+      ]
+    },
+    "transport": {
+      "dashboard": "transport.json",
+      "metrics": [
+        {"name":"zkdeal_process_uptime_seconds","type":"gauge","unit":"seconds","labels":[],"status":"owner-published"},
+        {"name":"zkdeal_sse_subscribers","type":"gauge","unit":"connections","labels":[],"status":"standalone-only"},
+        {"name":"zkdeal_sse_batches_flushed_total","type":"counter","unit":"batches","labels":[],"status":"standalone-only"},
+        {"name":"zkdeal_sse_events_batched_total","type":"counter","unit":"events","labels":[],"status":"standalone-only"},
+        {"name":"zkdeal_sse_events_dropped_total","type":"counter","unit":"events","labels":[],"status":"standalone-only"}
+      ]
+    }
+  }
+}

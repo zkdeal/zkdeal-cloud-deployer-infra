@@ -1,0 +1,11 @@
+route:
+  receiver: acceptance-webhook
+  group_by: [alertname]
+  group_wait: 1s
+  group_interval: 1s
+  repeat_interval: 1h
+receivers:
+  - name: acceptance-webhook
+    webhook_configs:
+      - url: http://webhook-test:9080/alerts
+        send_resolved: true

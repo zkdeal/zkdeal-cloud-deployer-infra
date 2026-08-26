@@ -1,0 +1,268 @@
+{{- if eq .Values.profile "production" }}
+{{- if ne .Values.storage.backend "external-transactional" }}{{ fail "production requires storage.backend=external-transactional" }}{{ end }}
+{{- if ne .Values.storage.fencing "owner-service-transactional" }}{{ fail "production requires owner-service transactional fencing" }}{{ end }}
+{{- if .Values.ownerCapabilities.filesystemApplicationStateAuthority }}{{ fail "production forbids filesystem application-state authority" }}{{ end }}
+{{- if .Values.ownerCapabilities.dataDirRequired }}{{ fail "production owner runtime must not require DATA_DIR state" }}{{ end }}
+{{- if not .Values.ownerCapabilities.readOnlyRootSupported }}{{ fail "production requires owner read-only-root support" }}{{ end }}
+{{- if ne .Values.ownerCapabilities.legacyObserverRoutes "retired-410" }}{{ fail "production requires legacy observer mutations to be retired with HTTP 410" }}{{ end }}
+{{- if ne .Values.ownerCapabilities.observationAuthority "postgresql-canonical-projection" }}{{ fail "production admission and observation authority must be the PostgreSQL canonical projection" }}{{ end }}
+{{- if ne .Values.availability.mode "warm-standby" }}{{ fail "production requires warm-standby availability" }}{{ end }}
+{{- if gt (int .Values.availability.rtoMinutes) 5 }}{{ fail "production warm-standby RTO must be five minutes or less" }}{{ end }}
+{{- if and (or .Values.components.indexer.enabled .Values.components.reconciler.enabled .Values.components.publisher.enabled .Values.components.autoClaimer.enabled .Values.components.capacityController.enabled) (not .Values.ownerCapabilities.delegatedWorkerMutations) }}{{ fail "independent owner worker pods require the delegated single-writer mutation capability" }}{{ end }}
+{{- if not .Values.availability.activeCoordinatorId }}{{ fail "production requires an active coordinator identity" }}{{ end }}
+{{- if not .Values.availability.standbyCoordinatorId }}{{ fail "production requires a standby coordinator identity" }}{{ end }}
+{{- if eq .Values.availability.activeCoordinatorId .Values.availability.standbyCoordinatorId }}{{ fail "active and standby coordinator identities must differ" }}{{ end }}
+{{- if not .Values.ownerCapabilities.blobArchivePrimitive }}{{ fail "production requires the owner-verified blob prepublish/archive primitive" }}{{ end }}
+{{- $rpcUrls := splitList "," .Values.chain.rpcUrls }}
+{{- $rpcProviderIds := splitList "," .Values.chain.rpcProviderIds }}
+{{- if lt (len $rpcUrls) 2 }}{{ fail "production requires two independent L1 RPC endpoints" }}{{ end }}
+{{- if ne (len $rpcUrls) (len $rpcProviderIds) }}{{ fail "production requires one provider identity per L1 RPC endpoint" }}{{ end }}
+{{- if eq (index $rpcProviderIds 0) (index $rpcProviderIds 1) }}{{ fail "production L1 RPC provider identities must differ" }}{{ end }}
+{{- range $endpoint := $rpcUrls }}
+{{- if not (regexMatch "^https://" $endpoint) }}{{ fail "production L1 RPC endpoints require HTTPS" }}{{ end }}
+{{- end }}
+{{- if not .Values.ownerCapabilities.publisherBroadcastEntrypoint }}{{ fail "production requires the owner-published fenced blob publisher entrypoint" }}{{ end }}
+{{- if not .Values.ownerCapabilities.publisherArchiveBeforeBroadcast }}{{ fail "production publisher requires archive-before-broadcast" }}{{ end }}
+{{- if not .Values.ownerCapabilities.publisherDurableNonceJournal }}{{ fail "production publisher requires a durable nonce journal" }}{{ end }}
+{{- if ne .Values.ownerCapabilities.publisherPostFinalitySurprise "RECOVERY_REQUIRED" }}{{ fail "production publisher must fail closed on post-finality surprise" }}{{ end }}
+{{- if not .Values.components.publisher.enabled }}{{ fail "production requires the owner-published publisher worker" }}{{ end }}
+{{- if not .Values.ownerCapabilities.autoClaimerEntrypoint }}{{ fail "production requires the owner-published withdrawal auto-claimer entrypoint" }}{{ end }}
+{{- if ne .Values.ownerCapabilities.autoClaimerWorkerComponent "withdrawal" }}{{ fail "production auto-claimer must hold the delegated withdrawal component lease" }}{{ end }}
+{{- if ne .Values.ownerCapabilities.withdrawalAcceptanceStatus "owner-live-pg-exact-byte-restart-and-external-race-gates-passed" }}{{ fail "production withdrawal auto-claimer requires the live exact-byte restart/external-race acceptance" }}{{ end }}
+{{- if not .Values.components.autoClaimer.enabled }}{{ fail "production requires exactly one owner-published withdrawal auto-claimer" }}{{ end }}
+{{- if ne (int .Values.components.autoClaimer.replicas) 1 }}{{ fail "production requires exactly one withdrawal auto-claimer per active coordinator epoch" }}{{ end }}
+{{- if ne (toJson .Values.components.autoClaimer.command) (toJson (list "node" "dist/hosted-withdrawal-worker.js" "run")) }}{{ fail "production auto-claimer command differs from the owner manifest" }}{{ end }}
+{{- if ne .Values.components.autoClaimer.image.repository .Values.components.coordinatorActive.image.repository }}{{ fail "production auto-claimer must consume the owner coordinator image" }}{{ end }}
+{{- if not .Values.ownerCapabilities.capacityEntrypoint }}{{ fail "production requires the owner-published capacity controller entrypoint" }}{{ end }}
+{{- if ne .Values.ownerCapabilities.capacityWorkerComponent "capacity" }}{{ fail "production capacity controller must hold the delegated capacity component lease" }}{{ end }}
+{{- if ne .Values.ownerCapabilities.capacityProviderProtocol "zkdeal-capacity-provider-v1" }}{{ fail "production capacity controller requires the owner capacity-provider v1 protocol" }}{{ end }}
+{{- if ne .Values.ownerCapabilities.capacityAcceptanceStatus "owner-live-pg-minio-provider-and-queue-gates-passed" }}{{ fail "production capacity controller requires owner live provider and queue acceptance" }}{{ end }}
+{{- if not .Values.components.capacityController.enabled }}{{ fail "production requires exactly one owner-published capacity controller" }}{{ end }}
+{{- if ne (int .Values.components.capacityController.replicas) 1 }}{{ fail "production requires exactly one capacity controller per active coordinator epoch" }}{{ end }}
+{{- if ne (toJson .Values.components.capacityController.command) (toJson (list "node" "dist/hosted-capacity-worker.js" "run")) }}{{ fail "production capacity controller command differs from the owner manifest" }}{{ end }}
+{{- if ne .Values.components.capacityController.image.repository .Values.components.coordinatorActive.image.repository }}{{ fail "production capacity controller must consume the owner coordinator image" }}{{ end }}
+{{- if not (regexMatch "^https://" (index .Values.components.capacityController.env "CAPACITY_PROVIDER_URL")) }}{{ fail "production capacity controller requires an HTTPS provider URL" }}{{ end }}
+{{- if not (hasKey .Values.components.capacityController.secretEnv "CAPACITY_PROVIDER_AUTH_TOKEN") }}{{ fail "production capacity controller requires a scoped provider bearer token secret" }}{{ end }}
+{{- if not .Values.ownerCapabilities.hostedAdmissionLease }}{{ fail "production headless room-node requires an owner-published admission lease" }}{{ end }}
+{{- if not .Values.ownerCapabilities.hostedRoomBatchEnabled }}{{ fail "production requires the owner managed room-batch publication path" }}{{ end }}
+{{- if not .Values.ownerCapabilities.hostedEngineToBatchInputV5 }}{{ fail "production requires the live app engine to current zkVM BatchInputV5 witness bridge" }}{{ end }}
+{{- if not .Values.ownerCapabilities.hostedDurablePostgresQueue }}{{ fail "production requires durable hosted PostgreSQL queue submission" }}{{ end }}
+{{- if .Values.components.queue.enabled }}{{ fail "production forbids the standalone filesystem proof queue Deployment" }}{{ end }}
+{{- if not .Values.ownerCapabilities.hostedExternalProver }}{{ fail "production requires the external authenticated prover path" }}{{ end }}
+{{- if not .Values.ownerCapabilities.hostedRestartResume }}{{ fail "production requires live restart/resume acceptance across the hosted proof path" }}{{ end }}
+{{- if .Values.ownerCapabilities.hostedFixturePrepare }}{{ fail "production forbids fixture-prepared hosted proof witnesses" }}{{ end }}
+{{- if .Values.ownerCapabilities.hostedLegacyGroth16 }}{{ fail "production forbids the legacy Groth16 checkpoint path" }}{{ end }}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" .Values.ownerCapabilities.hostedIntegrationAcceptanceToken) }}{{ fail "production requires the SHA-256 token of joint owner/headless live acceptance evidence" }}{{ end }}
+{{- if not .Values.components.headlessNode.enabled }}{{ fail "production requires the owner-published headless room-node" }}{{ end }}
+{{- if ne (int .Values.components.headlessNode.replicas) 1 }}{{ fail "each headless room-node deployment is bound to exactly one room and requires one replica" }}{{ end }}
+{{- if or (not .Values.components.headlessNode.roomNode.configMapName) (not .Values.components.headlessNode.roomNode.secretName) (not .Values.components.headlessNode.roomNode.artifactClaimName) }}{{ fail "production headless room-node requires external config, locked file-secret, and hash-bound artifact references" }}{{ end }}
+{{- if .Values.components.headlessNode.signerRole }}{{ fail "headless room-node uses owner-enforced locked file custody and must not receive a generic signer endpoint" }}{{ end }}
+{{- if hasKey .Values.components.headlessNode.secretEnv "NODE_SERVICE_KEY" }}{{ fail "headless room-node private keys must not be injected through environment variables" }}{{ end }}
+{{- if .Values.components.proverAgent.enabled }}
+{{- $agent := .Values.components.proverAgent }}
+{{- $coordinatorUrl := printf "http://%s-coordinator-active:%v" (include "zkdeal.fullname" .) .Values.components.coordinatorActive.port }}
+{{- if $agent.signerRole }}{{ fail "production prover agent must not receive any direct signer role" }}{{ end }}
+{{- if $agent.injectChain }}{{ fail "production prover agent must not receive direct L1 RPC configuration" }}{{ end }}
+{{- if $agent.allowExternalEgress }}{{ fail "production prover agent requires only internal coordinator and prover egress" }}{{ end }}
+{{- if ne (toJson $agent.command) (toJson (list "node" "/app/agent/agent.js")) }}{{ fail "production prover agent command differs from the packaged owner entrypoint" }}{{ end }}
+{{- if ne $agent.workingDir "/app" }}{{ fail "production prover agent working directory differs from the owner image" }}{{ end }}
+{{- if eq $agent.image.repository .Values.components.coordinatorActive.image.repository }}{{ fail "production prover agent requires its independently packaged owner-source image" }}{{ end }}
+{{- if ne (index $agent.env "QUEUE_URL") $coordinatorUrl }}{{ fail "production prover agent queue URL must be the hosted coordinator" }}{{ end }}
+{{- if ne (index $agent.env "NODE_LIVENESS_COORDINATOR_URL") $coordinatorUrl }}{{ fail "production prover agent liveness URL must be the hosted coordinator" }}{{ end }}
+{{- if not (index $agent.env "NODE_ID") }}{{ fail "production prover agent requires a bound node ID" }}{{ end }}
+{{- if regexMatch "^REPLACE" (toString (index $agent.env "NODE_ID")) }}{{ fail "production prover agent node ID is still a placeholder" }}{{ end }}
+{{- if not (regexMatch "^0x[0-9a-fA-F]{40}$" (toString (index $agent.env "NODE_LIVENESS_ACCOUNT"))) }}{{ fail "production prover agent requires the server-bound liveness account" }}{{ end }}
+{{- range $forbidden := list "NODE_SERVICE_KEY" "NODE_LIVENESS_SIGNER_URL" "NODE_LIVENESS_SIGNER_AUTH_TOKEN" "NODE_LIVENESS_DEV_MODE" "NODE_LIVENESS_DEV_PRIVATE_KEY" "L1_RPC_URL" }}
+{{- if or (hasKey $agent.env $forbidden) (hasKey $agent.secretEnv $forbidden) }}{{ fail (printf "production prover agent forbids direct sender environment %s" $forbidden) }}{{ end }}
+{{- end }}
+{{- range $required := list "ZKDEAL_QUEUE_NODE_TOKEN" "ZKDEAL_PROVER_TOKEN" "NODE_LIVENESS_COORDINATOR_AUTH_TOKEN" }}
+{{- if not (index $agent.secretEnv $required) }}{{ fail (printf "production prover agent requires scoped secret %s" $required) }}{{ end }}
+{{- end }}
+{{- if not .Values.components.prover.enabled }}{{ fail "production prover agent requires the authenticated external prover Deployment" }}{{ end }}
+{{- $liveness := index .Values.externalServices.signerRoles "liveness" }}
+{{- if not (regexMatch "^https://" $liveness.address) }}{{ fail "production coordinator liveness signer requires HTTPS" }}{{ end }}
+{{- if not (regexMatch "^0x[0-9a-fA-F]{40}$" $liveness.signerAddress) }}{{ fail "production coordinator liveness signer requires its expected account" }}{{ end }}
+{{- if not (index .Values.components.coordinatorActive.secretEnv "NODE_LIVENESS_SIGNER_AUTH_TOKEN") }}{{ fail "production coordinator requires the scoped liveness signer token" }}{{ end }}
+{{- end }}
+{{- $beaconSidecars := splitList "," .Values.chain.beaconSidecarUrls }}
+{{- if lt (len $beaconSidecars) 2 }}{{ fail "production requires two beacon sidecar fallback endpoints" }}{{ end }}
+{{- range $endpoint := $beaconSidecars }}
+{{- if not (regexMatch "^https://" $endpoint) }}{{ fail "production beacon sidecar endpoints require HTTPS" }}{{ end }}
+{{- end }}
+{{- range $workerName := list "indexer" "reconciler" "publisher" "autoClaimer" "capacityController" }}
+{{- $worker := index $.Values.components $workerName }}
+{{- if and $worker.enabled (ne (int $worker.replicas) 1) }}{{ fail (printf "%s currently requires exactly one Recreate pod per delegated worker identity" $workerName) }}{{ end }}
+{{- end }}
+{{- if not .Values.global.existingSecret }}{{ fail "production requires global.existingSecret" }}{{ end }}
+{{- if not .Values.ingress.tls.enabled }}{{ fail "production ingress requires TLS" }}{{ end }}
+{{- if empty .Values.networkPolicy.ingressNamespaceSelector.matchLabels }}{{ fail "production requires a nonempty labeled ingress namespace selector" }}{{ end }}
+{{- if empty .Values.networkPolicy.ingressPodSelector.matchLabels }}{{ fail "production requires a nonempty labeled ingress pod selector" }}{{ end }}
+{{- if empty .Values.networkPolicy.monitoringNamespaceSelector.matchLabels }}{{ fail "production requires a nonempty labeled monitoring namespace selector" }}{{ end }}
+{{- if empty .Values.networkPolicy.monitoringPodSelector.matchLabels }}{{ fail "production requires a nonempty labeled monitoring pod selector" }}{{ end }}
+{{- if empty .Values.networkPolicy.externalEgressCidrs }}{{ fail "production requires explicit external egress CIDRs" }}{{ end }}
+{{- range .Values.networkPolicy.externalEgressCidrs }}
+{{- if or (eq . "0.0.0.0/0") (eq . "::/0") }}{{ fail "production external egress may not allow the whole Internet" }}{{ end }}
+{{- end }}
+{{- range $name, $component := .Values.components }}
+{{- if $component.enabled }}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $component.image.digest) }}{{ fail (printf "production component %s requires a concrete sha256 image digest" $name) }}{{ end }}
+{{- if and (ne $name "docs") (empty $component.command) }}{{ fail (printf "production component %s requires an owner-published command" $name) }}{{ end }}
+{{- range $envName, $_ := $component.secretEnv }}
+{{- if eq $envName "HOSTING_ADMIN_TOKEN" }}{{ fail "production forbids the dev-only static HOSTING_ADMIN_TOKEN" }}{{ end }}
+{{- end }}
+{{- if $component.signerRole }}
+{{- $role := index $.Values.externalServices.signerRoles $component.signerRole }}
+{{- if not $role.address }}{{ fail (printf "production component %s signer role has no address" $name) }}{{ end }}
+{{- if empty $role.cidrs }}{{ fail (printf "production component %s signer role has no isolated CIDR" $name) }}{{ end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $requiredSignerRoles := list "liveness" "operationsSettlement" "payout" "finalityOracle" "sponsorRelayer" "withdrawalRelayer" "blobPublisher" }}
+{{- range $roleName := $requiredSignerRoles }}
+{{- $role := index $.Values.externalServices.signerRoles $roleName }}
+{{- if not (regexMatch "^https://" $role.address) }}{{ fail (printf "production signer role %s requires an HTTPS address" $roleName) }}{{ end }}
+{{- if empty $role.cidrs }}{{ fail (printf "production signer role %s requires explicit CIDRs" $roleName) }}{{ end }}
+{{- range $cidr := $role.cidrs }}
+{{- if or (eq $cidr "0.0.0.0/0") (eq $cidr "::/0") }}{{ fail (printf "production signer role %s has unbounded egress" $roleName) }}{{ end }}
+{{- range $.Values.networkPolicy.externalEgressCidrs }}
+{{- if eq . $cidr }}{{ fail (printf "signer CIDR %s must not be in generic external egress" $cidr) }}{{ end }}
+{{- end }}
+{{- end }}
+{{- range $otherName := $requiredSignerRoles }}
+{{- if ne $roleName $otherName }}
+{{- $other := index $.Values.externalServices.signerRoles $otherName }}
+{{- if eq $role.address $other.address }}{{ fail "production signer roles require distinct addresses" }}{{ end }}
+{{- range $cidr := $role.cidrs }}{{- range $otherCidr := $other.cidrs }}
+{{- if eq $cidr $otherCidr }}{{ fail "production signer roles require disjoint CIDRs" }}{{ end }}
+{{- end }}{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if not (regexMatch "^0x[0-9a-fA-F]{40}$" .Values.externalServices.signerRoles.blobPublisher.signerAddress) }}{{ fail "production blob publisher requires an explicit signer address" }}{{ end }}
+{{- if not (regexMatch "^0x[0-9a-fA-F]{40}$" .Values.externalServices.signerRoles.withdrawalRelayer.signerAddress) }}{{ fail "production withdrawal auto-claimer requires an explicit signer address" }}{{ end }}
+{{- if eq (lower .Values.externalServices.signerRoles.withdrawalRelayer.signerAddress) (lower .Values.externalServices.signerRoles.blobPublisher.signerAddress) }}{{ fail "withdrawal and blob publisher signer identities must differ" }}{{ end }}
+{{- if .Values.operations.backup.enabled }}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" .Values.operations.backup.image.digest) }}{{ fail "production backup image requires a concrete sha256 digest" }}{{ end }}
+{{- if lt (int .Values.operations.backup.retentionDays) 365 }}{{ fail "production backup retention must be at least 365 days" }}{{ end }}
+{{- if empty .Values.networkPolicy.operationalFlows.backup.cidrs }}{{ fail "production backup requires explicit database/source/backup-store CIDRs" }}{{ end }}
+{{- if eq .Values.operations.backup.targetObjectStoreEndpointSecretKey .Values.storage.objectStoreEndpointSecretKey }}{{ fail "production backup target must use failure-independent object-store credentials" }}{{ end }}
+{{- end }}
+{{- if .Values.operations.restore.enabled }}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" .Values.operations.restore.image.digest) }}{{ fail "production restore image requires a concrete sha256 digest" }}{{ end }}
+{{- end }}
+{{- if not .Values.operations.promotion.enabled }}{{ fail "production warm-standby requires gated promotion operations" }}{{ end }}
+{{- if not (contains "coordinator-standby" .Values.operations.promotion.endpoint) }}{{ fail "promotion endpoint must target the standby service" }}{{ end }}
+{{- if .Values.operations.promotion.manualJobEnabled }}
+{{- if gt (int .Values.operations.promotion.activeDeadlineSeconds) 300 }}{{ fail "promotion job must be bounded by the five-minute RTO" }}{{ end }}
+{{- if not (regexMatch "^[0-9A-Fa-f]+/[0-9A-Fa-f]+$" .Values.operations.promotion.requiredReplayLsn) }}{{ fail "promotion requires the fenced primary flush LSN" }}{{ end }}
+{{- if empty .Values.networkPolicy.operationalFlows.promotion.cidrs }}{{ fail "production promotion requires explicit database CIDRs" }}{{ end }}
+{{- $hasPromotionDbPort := false }}
+{{- range $port := .Values.networkPolicy.operationalFlows.promotion.ports }}
+{{- if eq (int $port) 5432 }}{{- $hasPromotionDbPort = true }}{{- end }}
+{{- end }}
+{{- if not $hasPromotionDbPort }}{{ fail "production promotion database flow must include port 5432" }}{{ end }}
+{{- if not .Values.operations.promotion.databaseUrlSecretKey }}{{ fail "promotion requires a scoped target database URL" }}{{ end }}
+{{- if not .Values.operations.promotion.idempotencyKeySecretKey }}{{ fail "promotion requires a one-time idempotency key" }}{{ end }}
+{{- if not .Values.operations.promotion.principalTokenSecretKey }}{{ fail "promotion requires a scoped hosting-admin principal token" }}{{ end }}
+{{- end }}
+{{- $controller := .Values.operations.promotion.controller }}
+{{- if not $controller.enabled }}{{ fail "production warm-standby requires the automated promotion controller" }}{{ end }}
+{{- if not $controller.armed }}{{ fail "production promotion controller requires an explicit incident approval arm" }}{{ end }}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $controller.image.digest) }}{{ fail "production promotion controller requires a concrete sha256 image digest" }}{{ end }}
+{{- if lt (len $controller.activeHealthUrls) 2 }}{{ fail "promotion controller requires two independent active-health witnesses" }}{{ end }}
+{{- if eq (index $controller.activeHealthUrls 0) (index $controller.activeHealthUrls 1) }}{{ fail "promotion controller active-health witnesses must differ" }}{{ end }}
+{{- range $witness := $controller.activeHealthUrls }}
+{{- if not (regexMatch "^https://" $witness) }}{{ fail "promotion controller active-health witnesses require HTTPS" }}{{ end }}
+{{- end }}
+{{- if not (contains "coordinator-standby" $controller.standbyHealthUrl) }}{{ fail "promotion controller standby health URL must target the signerless standby service" }}{{ end }}
+{{- if not (regexMatch "^https://" $controller.failoverProviderUrl) }}{{ fail "promotion controller failover provider requires HTTPS" }}{{ end }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9._:-]{7,199}$" $controller.candidateId) }}{{ fail "promotion controller requires a unique lowercase incident candidate ID" }}{{ end }}
+{{- if lt (int $controller.failureThreshold) 3 }}{{ fail "promotion controller requires at least three consecutive failed witness rounds" }}{{ end }}
+{{- if gt (int $controller.maxRtoSeconds) (mul (int .Values.availability.rtoMinutes) 60) }}{{ fail "promotion controller maximum RTO exceeds the availability objective" }}{{ end }}
+{{- if or (not $controller.providerTokenSecretKey) (not $controller.approvalTokenSecretKey) (not $controller.principalTokenSecretKey) }}{{ fail "promotion controller requires provider, approval, and owner principal secret refs" }}{{ end }}
+{{- if or (eq $controller.providerTokenSecretKey $controller.approvalTokenSecretKey) (eq $controller.providerTokenSecretKey $controller.principalTokenSecretKey) (eq $controller.approvalTokenSecretKey $controller.principalTokenSecretKey) }}{{ fail "promotion controller credentials require distinct secret keys" }}{{ end }}
+{{- if empty .Values.networkPolicy.operationalFlows.promotionController.cidrs }}{{ fail "production promotion controller requires explicit witness/provider CIDRs" }}{{ end }}
+{{- $provider := .Values.operations.promotion.provider }}
+{{- if not $provider.enabled }}{{ fail "production warm-standby requires the first-party failover provider" }}{{ end }}
+{{- if ne $provider.platform "kubernetes" }}{{ fail "production Helm failover provider must use the kubernetes adapter" }}{{ end }}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $provider.image.digest) }}{{ fail "production failover provider requires a concrete sha256 image digest" }}{{ end }}
+{{- if lt (len $provider.activeHealthUrls) 2 }}{{ fail "failover provider requires two independent active-health witnesses" }}{{ end }}
+{{- if ne (toJson $provider.activeHealthUrls) (toJson $controller.activeHealthUrls) }}{{ fail "controller and failover provider must use the same independent witness set" }}{{ end }}
+{{- range $witness := $provider.activeHealthUrls }}
+{{- if not (regexMatch "^https://" $witness) }}{{ fail "failover provider active-health witnesses require HTTPS" }}{{ end }}
+{{- end }}
+{{- if ne $provider.standbyHealthUrl $controller.standbyHealthUrl }}{{ fail "controller and failover provider must use the same standby health gate" }}{{ end }}
+{{- if not (contains "coordinator-standby" $provider.standbyHealthUrl) }}{{ fail "failover provider standby health URL must target the signerless standby service" }}{{ end }}
+{{- if or (empty $provider.indexerFreshnessUrl) (contains "REPLACE" $provider.indexerFreshnessUrl) (contains "registry.invalid" $provider.indexerFreshnessUrl) }}{{ fail "production failover provider requires the owner-advertised canonical indexer freshness URL" }}{{ end }}
+{{- if not (or (regexMatch "^https://" $provider.indexerFreshnessUrl) (regexMatch "^http://[a-z0-9]" $provider.indexerFreshnessUrl)) }}{{ fail "failover provider indexer freshness URL must be HTTPS or an explicit in-cluster service" }}{{ end }}
+{{- if or (not $provider.stateClaimName) (not $provider.tlsSecretName) (not $provider.tlsCertKey) (not $provider.tlsPrivateKey) }}{{ fail "failover provider requires durable state and TLS secret refs" }}{{ end }}
+{{- if or (not $provider.providerTokenSecretKey) (not $provider.approvalTokenSecretKey) }}{{ fail "failover provider requires scoped provider and approval secret refs" }}{{ end }}
+{{- if eq $provider.providerTokenSecretKey $provider.approvalTokenSecretKey }}{{ fail "failover provider credentials require distinct secret keys" }}{{ end }}
+{{- if or (ne $provider.providerTokenSecretKey $controller.providerTokenSecretKey) (ne $provider.approvalTokenSecretKey $controller.approvalTokenSecretKey) }}{{ fail "controller and failover provider credential refs must match" }}{{ end }}
+{{- if gt (int $provider.platformTimeoutSeconds) (mul (int .Values.availability.rtoMinutes) 60) }}{{ fail "failover provider platform timeout exceeds the availability objective" }}{{ end }}
+{{- if or (gt (int $provider.requestTimeoutSeconds) 30) (ge (int $provider.requestTimeoutSeconds) (int $provider.platformTimeoutSeconds)) }}{{ fail "failover provider request timeout is unsafe" }}{{ end }}
+{{- $expectedWriterService := printf "%s-coordinator-writer" (include "zkdeal.fullname" .) }}
+{{- $expectedSignerAuthority := printf "%s-standby-signer-authority" (include "zkdeal.fullname" .) }}
+{{- if ne $provider.applicationService $expectedWriterService }}{{ fail "failover provider application route must be the chart-owned stable writer Service" }}{{ end }}
+{{- if ne $provider.signerAuthorityDeployment $expectedSignerAuthority }}{{ fail "failover provider signer authority must be the chart-owned post-fence Deployment" }}{{ end }}
+{{- if ne $provider.routeScopeLabelKey "app.kubernetes.io/instance" }}{{ fail "failover provider route scope must use the Helm instance label" }}{{ end }}
+{{- if ne $provider.routeScopeLabelValue .Release.Name }}{{ fail "failover provider route scope must equal the Helm release name" }}{{ end }}
+{{- if ne $provider.routeLabelKey "zkdeal.io/failover-target" }}{{ fail "failover provider route selector key differs from the chart-owned failover label" }}{{ end }}
+{{- if ne $provider.standbyRouteValue "standby" }}{{ fail "failover provider standby route value differs from the chart-owned standby label" }}{{ end }}
+{{- range $resourceName := list $provider.primaryDatabaseStatefulSet $provider.primaryDatabasePod $provider.standbyDatabasePod $provider.postgresContainer $provider.databaseService $provider.pgUser $provider.pgDatabase }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9.-]{0,62}$" $resourceName) }}{{ fail "failover provider Kubernetes/PostgreSQL resource names must be concrete and fixed" }}{{ end }}
+{{- end }}
+{{- if eq $provider.primaryDatabasePod $provider.standbyDatabasePod }}{{ fail "failover provider primary and standby database pods must differ" }}{{ end }}
+{{- if not (regexMatch "^/[^[:space:]]+$" $provider.pgData) }}{{ fail "failover provider PostgreSQL data path must be absolute" }}{{ end }}
+{{- if not $provider.signerAuthority.enabled }}{{ fail "production failover requires the chart-owned post-fence signer authority" }}{{ end }}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $provider.signerAuthority.image.digest) }}{{ fail "production signer authority requires a concrete sha256 image digest" }}{{ end }}
+{{- $expectedProviderUrl := printf "https://%s-failover-provider:%v/v1/failovers" (include "zkdeal.fullname" .) $provider.servicePort }}
+{{- if ne $controller.failoverProviderUrl $expectedProviderUrl }}{{ fail "promotion controller must call the chart-owned failover provider Service" }}{{ end }}
+{{- $providerFlow := .Values.networkPolicy.operationalFlows.failoverProvider }}
+{{- if lt (len $providerFlow.cidrs) 3 }}{{ fail "production failover provider requires explicit CIDRs for two witnesses and the Kubernetes API" }}{{ end }}
+{{- range $cidr := $providerFlow.cidrs }}
+{{- if or (eq $cidr "0.0.0.0/0") (eq $cidr "::/0") }}{{ fail "production failover provider egress may not allow the whole Internet" }}{{ end }}
+{{- end }}
+{{- if or (ne (len $providerFlow.ports) 1) (ne (int (index $providerFlow.ports 0)) 443) }}{{ fail "production failover provider external egress must be restricted to port 443" }}{{ end }}
+{{- $signerFlow := .Values.networkPolicy.operationalFlows.signerAuthority }}
+{{- if or (ne (len $signerFlow.ports) 1) (ne (int (index $signerFlow.ports 0)) 443) }}{{ fail "production signer authority egress must be restricted to port 443" }}{{ end }}
+{{- $postFenceRoles := list "operationsSettlement" "payout" "finalityOracle" "sponsorRelayer" "withdrawalRelayer" "blobPublisher" }}
+{{- range $roleName := $postFenceRoles }}
+{{- range $cidr := (index $.Values.externalServices.signerRoles $roleName).cidrs }}
+{{- if not (has $cidr $signerFlow.cidrs) }}{{ fail (printf "signer authority egress is missing scoped role CIDR %s" $cidr) }}{{ end }}
+{{- end }}
+{{- end }}
+{{- range $cidr := $signerFlow.cidrs }}
+{{- $known := false }}
+{{- range $roleName := $postFenceRoles }}
+{{- if has $cidr (index $.Values.externalServices.signerRoles $roleName).cidrs }}{{- $known = true }}{{- end }}
+{{- end }}
+{{- if not $known }}{{ fail (printf "signer authority egress CIDR %s is not assigned to a scoped signer role" $cidr) }}{{ end }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.storage.backend "filesystem" }}
+{{- range $name, $component := .Values.components }}
+{{- if and $component.enabled (or (eq $component.role "active") (eq $component.role "queue")) (gt (int $component.replicas) 1) }}
+{{- fail (printf "filesystem-authoritative %s cannot have more than one replica" $name) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- /*
+Hosting-service topology gate (every profile): the retired placeholder image
+and placeholder-only service slots must never return. Tenant/entitlement and
+sponsorship-registration APIs are coordinator routes; finalized-checkpoint and
+sponsor mutations are owner managed L1 operations on the coordinator plane.
+*/}}
+{{- range $name, $component := .Values.components }}
+{{- if contains "zkdeal-hosting-services" (toString $component.image.repository) }}
+{{- fail (printf "component %s uses the retired zkdeal-hosting-services placeholder image" $name) }}
+{{- end }}
+{{- if and $component.enabled (ne $name "docs") (empty $component.command) }}
+{{- fail (printf "component %s is enabled without an owner-published command" $name) }}
+{{- end }}
+{{- end }}
+{{- range $retired := list "tenantApi" "sponsorship" "finalityOracle" "providerPayout" }}
+{{- if hasKey $.Values.components $retired }}
+{{- fail (printf "components.%s is a retired placeholder slot; its responsibility is coordinator-integrated or an owner managed L1 operation" $retired) }}
+{{- end }}
+{{- end }}

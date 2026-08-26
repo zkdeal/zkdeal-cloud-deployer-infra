@@ -1,0 +1,38 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Coordinator up",
+      "targets": [{ "expr": "up{job=\"coordinator\"}", "refId": "A" }],
+      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 0 }
+    },
+    {
+      "type": "stat",
+      "title": "Waiting proof jobs",
+      "targets": [{ "expr": "zkdeal_queue_jobs_waiting", "refId": "A" }],
+      "gridPos": { "h": 7, "w": 6, "x": 6, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Oldest waiting job (seconds)",
+      "targets": [{ "expr": "zkdeal_queue_oldest_waiting_age_seconds", "refId": "A" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Lease expiry rate",
+      "targets": [{ "expr": "rate(zkdeal_queue_leases_expired_total[5m])", "refId": "A" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 }
+    }
+  ],
+  "schemaVersion": 41,
+  "tags": ["zkdeal", "hosting"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "zkdeal hosting overview",
+  "uid": "zkdeal-hosting",
+  "version": 1
+}

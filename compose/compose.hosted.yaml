@@ -1,0 +1,345 @@
+# Real owner-hosted service plane. Combine with compose.yaml and
+# compose.dependencies.yaml. This overlay deliberately publishes no host ports;
+# it is reachable only through the front door or from the internal network.
+# PostgreSQL and MinIO use local administrator credentials here solely for an
+# isolated development drill. Production must supply scoped database/S3 roles.
+
+x-hosted-owner: &hosted-owner
+  image: ${COORDINATOR_IMAGE:-zkdeal-coordinator:local}
+  build:
+    context: ../..
+    dockerfile: web2-api/server/Dockerfile
+  working_dir: /app/web2-api/server
+  init: true
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  read_only: true
+  tmpfs: ["/tmp:size=64m,mode=1777"]
+
+x-hosted-runtime-env: &hosted-runtime-env
+  CHAIN_ID: ${CHAIN_ID:-31337}
+  L1_RPC_URL: ${L1_RPC_URL:?set the primary L1 RPC URL}
+  L1_RPC_URLS: ${L1_RPC_URLS:?set two independent L1 RPC URLs}
+  L1_RPC_PROVIDER_IDS: ${L1_RPC_PROVIDER_IDS:?set one independent provider identity per L1 RPC URL}
+  BEACON_SIDECAR_URLS: ${BEACON_SIDECAR_URLS:?set independently operated beacon sidecar endpoints}
+  ROOM_MANAGER: ${ROOM_MANAGER:?set the deployed RoomManager address}
+  ROOM_POOL: ${ROOM_POOL:?set the deployed RoomPool address}
+  ACCESS_TOKEN: ${ACCESS_TOKEN:?set the deployed access-token address}
+  DATABASE_URL: ${DATABASE_URL:?set the hosted PostgreSQL URL}
+  API_KEY_PEPPER: ${API_KEY_PEPPER:?set a random API key pepper of at least 32 characters}
+  OBJECT_STORE_ENDPOINT: http://minio:9000
+  OBJECT_STORE_BUCKET: zkdeal
+  OBJECT_STORE_REGION: us-east-1
+  OBJECT_STORE_PREFIX: hosted
+  OBJECT_STORE_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?set a local MinIO user}
+  OBJECT_STORE_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set a local MinIO password}
+  MAX_ARCHIVE_LAG_BLOCKS: "8"
+  DEMO_ENABLED: "0"
+  QUEUE_ENABLED: "0"
+
+services:
+  prometheus:
+    volumes:
+      - ../observability/prometheus/prometheus.hosted.yml:/etc/prometheus/prometheus.yml:ro
+
+  minio-init:
+    command:
+      - >-
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}";
+        mc mb --ignore-existing local/zkdeal;
+        mc anonymous set none local/zkdeal;
+        mc mb --ignore-existing local/zkdeal-evidence;
+        mc anonymous set none local/zkdeal-evidence
+
+  coordinator:
+    profiles: ["hosted"]
+    command: ["node", "dist/index.js"]
+    environment:
+      <<: *hosted-runtime-env
+      PORT: "3000"
+      HOST: 0.0.0.0
+      COORDINATOR_ROLE: active
+      COORDINATOR_ID: ${ACTIVE_COORDINATOR_ID:-compose-active-region}
+      INDEXER_TOKEN: ${INDEXER_TOKEN:?set a scoped indexer API token}
+      ADMISSION_TOKEN: ${ADMISSION_TOKEN:?set a scoped admission API token}
+    volumes: !reset []
+    depends_on: !override
+      postgres: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/hosting/v1/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+  coordinator-standby:
+    <<: *hosted-owner
+    profiles: ["hosted"]
+    command: ["node", "dist/index.js"]
+    environment:
+      <<: *hosted-runtime-env
+      PORT: "3000"
+      HOST: 0.0.0.0
+      COORDINATOR_ROLE: standby
+      COORDINATOR_ID: ${STANDBY_COORDINATOR_ID:-compose-standby-region}
+    expose: ["3000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/hosting/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    networks: [internal, egress]
+
+  indexer:
+    <<: *hosted-owner
+    profiles: ["hosted"]
+    command: ["node", "dist/hosted-worker.js", "indexer"]
+    environment:
+      <<: *hosted-runtime-env
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: "3001"
+      HOSTED_WORKER_ROLE: indexer
+      HOSTED_WORKER_ID: compose-indexer-1
+      COORDINATOR_ID: ${ACTIVE_COORDINATOR_ID:-compose-active-region}
+      INDEXER_BOOTSTRAP_BLOCK: ${INDEXER_BOOTSTRAP_BLOCK:-finalized}
+    expose: ["3001"]
+    depends_on:
+      coordinator: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    networks: [internal, egress]
+
+  reconciler:
+    <<: *hosted-owner
+    profiles: ["hosted"]
+    command: ["node", "dist/hosted-worker.js", "reconciler"]
+    environment:
+      <<: *hosted-runtime-env
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: "3001"
+      HOSTED_WORKER_ROLE: reconciler
+      HOSTED_WORKER_ID: compose-reconciler-1
+      COORDINATOR_ID: ${ACTIVE_COORDINATOR_ID:-compose-active-region}
+      INDEXER_BOOTSTRAP_BLOCK: ${INDEXER_BOOTSTRAP_BLOCK:-finalized}
+    expose: ["3001"]
+    depends_on:
+      coordinator: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    networks: [internal, egress]
+
+  publisher:
+    <<: *hosted-owner
+    profiles: ["hosted"]
+    command: ["node", "dist/hosted-publisher-worker.js"]
+    environment:
+      <<: *hosted-runtime-env
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: "3002"
+      HOSTED_WORKER_ID: compose-publisher-1
+      COORDINATOR_ID: ${ACTIVE_COORDINATOR_ID:-compose-active-region}
+      BLOB_PUBLISHER_ENABLED: "1"
+      L1_SIGNER_URL: ${L1_SIGNER_URL:?set the scoped blob-publisher Web3Signer URL}
+      L1_SIGNER_ADDRESS: ${L1_SIGNER_ADDRESS:?set the blob-publisher signer address}
+      L1_SIGNER_AUTH_TOKEN: ${L1_SIGNER_AUTH_TOKEN:?set the scoped blob-publisher signer token}
+    expose: ["3002"]
+    depends_on:
+      coordinator: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    networks: [internal, egress]
+
+  # Sole fenced withdrawal component. Tenant proof/request/status REST and
+  # JSON-RPC remain in coordinator; there is deliberately no second
+  # "withdrawal" service or worker process.
+  auto-claimer:
+    <<: *hosted-owner
+    profiles: ["hosted"]
+    command: ["node", "dist/hosted-withdrawal-worker.js", "run"]
+    environment:
+      <<: *hosted-runtime-env
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: "3003"
+      HOSTED_WORKER_ID: compose-auto-claimer-1
+      HOSTED_WORKER_INTERVAL_MS: "3000"
+      COORDINATOR_ID: ${ACTIVE_COORDINATOR_ID:-compose-active-region}
+      WITHDRAWAL_CLAIMER_ENABLED: "1"
+      WITHDRAWAL_CLAIM_GAS_LIMIT: "500000"
+      WITHDRAWAL_CLAIM_INCLUSION_WINDOW_BLOCKS: "64"
+      WITHDRAWAL_SIGNER_URL: ${WITHDRAWAL_SIGNER_URL:?set the scoped withdrawal-relayer Web3Signer URL}
+      WITHDRAWAL_SIGNER_ADDRESS: ${WITHDRAWAL_SIGNER_ADDRESS:?set the withdrawal-relayer signer address}
+      WITHDRAWAL_SIGNER_AUTH_TOKEN: ${WITHDRAWAL_SIGNER_AUTH_TOKEN:?set the scoped withdrawal-relayer signer token}
+      WITHDRAWAL_SIGNER_PREVIOUS_AUTH_TOKEN: ${WITHDRAWAL_SIGNER_PREVIOUS_AUTH_TOKEN:-}
+    expose: ["3003"]
+    depends_on:
+      coordinator: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3003/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    networks: [internal, egress]
+
+  # Sole delegated capacity component for the active coordinator epoch. The
+  # provider boundary is an internal, authenticated, idempotent API described
+  # by web2-api/server/capabilities/capacity-provider-v1.openapi.json.
+  capacity-controller:
+    <<: *hosted-owner
+    profiles: ["hosted"]
+    command: ["node", "dist/hosted-capacity-worker.js", "run"]
+    environment:
+      <<: *hosted-runtime-env
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: "3004"
+      HOSTED_WORKER_ID: compose-capacity-1
+      HOSTED_WORKER_INTERVAL_MS: "3000"
+      COORDINATOR_ID: ${ACTIVE_COORDINATOR_ID:-compose-active-region}
+      CAPACITY_CONTROLLER_ENABLED: "1"
+      CAPACITY_PROVIDER_URL: ${CAPACITY_PROVIDER_URL:?set the scoped capacity-provider v1 URL}
+      CAPACITY_PROVIDER_AUTH_TOKEN: ${CAPACITY_PROVIDER_AUTH_TOKEN:?set the scoped capacity-provider bearer token}
+      CAPACITY_PROVIDER_PREVIOUS_AUTH_TOKEN: ${CAPACITY_PROVIDER_PREVIOUS_AUTH_TOKEN:-}
+      CAPACITY_LEASE_TTL_MS: ${CAPACITY_LEASE_TTL_MS:-30000}
+      CAPACITY_BATCH_SIZE: ${CAPACITY_BATCH_SIZE:-20}
+    expose: ["3004"]
+    depends_on:
+      coordinator: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3004/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    networks: [internal, egress]
+
+  # The init copies operator-supplied files into a Linux volume with mode 0600.
+  # This keeps the owner's strict file-custody check valid on Windows hosts too;
+  # the private key and control token are never transported as environment data.
+  headless-node-secret-init:
+    image: ${HEADLESS_NODE_IMAGE:-zkdeal-headless-room-node:local}
+    build:
+      context: ../..
+      dockerfile: app-node/packages/room-node/Dockerfile
+    profiles: ["hosted"]
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        umask 077;
+        cp /source/keys.json /destination/keys.json;
+        cp /source/control.token /destination/control.token;
+        chmod 0600 /destination/keys.json /destination/control.token;
+        chown 10001:10001 /destination/keys.json /destination/control.token
+    volumes:
+      - ${ROOM_NODE_KEYS_FILE:?set the operator-owned room-node key file}:/source/keys.json:ro
+      - ${ROOM_NODE_CONTROL_TOKEN_FILE:?set the operator-owned room-node control token file}:/source/control.token:ro
+      - room-node-secrets:/destination
+    network_mode: none
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN"]
+    read_only: true
+
+  headless-node:
+    image: ${HEADLESS_NODE_IMAGE:-zkdeal-headless-room-node:local}
+    build:
+      context: ../..
+      dockerfile: app-node/packages/room-node/Dockerfile
+    profiles: ["hosted"]
+    command: ["node", "dist/cli.js", "run"]
+    working_dir: /app/app-node/packages/room-node
+    environment:
+      ROOM_NODE_CONFIG_PATH: /run/zkdeal/room-node.json
+    volumes:
+      - ${ROOM_NODE_CONFIG_FILE:?set the room-node config file}:/run/zkdeal/room-node.json:ro
+      - ${ROOM_NODE_ARTIFACT_DIR:?set the hash-bound room-node artifact directory}:/opt/zkdeal/artifacts:ro
+      - room-node-secrets:/run/zkdeal-secrets:ro
+      - room-node-state:/var/lib/zkdeal-room-node
+    expose: ["3100"]
+    depends_on:
+      headless-node-secret-init: { condition: service_completed_successfully }
+      coordinator: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    init: true
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    networks: [internal]
+
+  # Provider-neutral automated warm-standby controller. It has no database or
+  # signer credential: two independent witnesses must fail, then a separately
+  # approved provider proves old-writer fencing, DB replay/promotion and stable
+  # endpoint routing before the owner promotion and post-fence route commit.
+  promotion-controller:
+    image: ${PROMOTION_CONTROLLER_IMAGE:-zkdeal-promotion-controller:local}
+    build:
+      context: ..
+      dockerfile: promotion-controller/Dockerfile
+    profiles: ["promotion-controller"]
+    environment:
+      ACTIVE_HEALTH_URLS: ${ACTIVE_PROMOTION_HEALTH_URLS:?set two independent HTTPS active-health witnesses}
+      STANDBY_HEALTH_URL: http://coordinator-standby:3000/hosting/v1/health
+      FAILOVER_PROVIDER_URL: ${FAILOVER_PROVIDER_URL:?set the HTTPS failover-provider v1 URL}
+      PROMOTION_ENDPOINT: http://coordinator-standby:3000/hosting/v1/admin/promote
+      ACTIVE_COORDINATOR_ID: ${ACTIVE_COORDINATOR_ID:-compose-active-region}
+      STANDBY_COORDINATOR_ID: ${STANDBY_COORDINATOR_ID:-compose-standby-region}
+      PROMOTION_CANDIDATE_ID: ${PROMOTION_CANDIDATE_ID:?set a unique incident candidate ID}
+      PROMOTION_CONTROLLER_ARMED: ${PROMOTION_CONTROLLER_ARMED:-false}
+      FAILURE_THRESHOLD: ${PROMOTION_FAILURE_THRESHOLD:-3}
+      POLL_SECONDS: ${PROMOTION_POLL_SECONDS:-10}
+      MAX_MONITOR_CYCLES: "0"
+      MAX_RTO_SECONDS: ${PROMOTION_MAX_RTO_SECONDS:-240}
+      MAX_CHECKPOINT_AGE_SECONDS: ${PROMOTION_MAX_CHECKPOINT_AGE_SECONDS:-30}
+      REQUEST_TIMEOUT_SECONDS: ${PROMOTION_REQUEST_TIMEOUT_SECONDS:-10}
+      PROMOTION_CONTROLLER_STATE_PATH: /tmp/promotion-controller-state.json
+      FAILOVER_PROVIDER_TOKEN_FILE: /run/secrets/failover-provider-token
+      FAILOVER_APPROVAL_TOKEN_FILE: /run/secrets/failover-approval-token
+      PROMOTION_PRINCIPAL_TOKEN_FILE: /run/secrets/promotion-principal-token
+    volumes:
+      - ${FAILOVER_PROVIDER_TOKEN_FILE:?set a scoped provider-token file}:/run/secrets/failover-provider-token:ro
+      - ${FAILOVER_APPROVAL_TOKEN_FILE:?set a separate incident approval-token file}:/run/secrets/failover-approval-token:ro
+      - ${PROMOTION_PRINCIPAL_TOKEN_FILE:?set a scoped owner promotion-token file}:/run/secrets/promotion-principal-token:ro
+    depends_on:
+      coordinator-standby: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,time;v=json.load(open('/tmp/promotion-controller-state.json'));assert time.time()*1000-v['observedAtUnixMs']<180000"]
+      interval: 20s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+    init: true
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    networks: [internal, egress]
+
+volumes:
+  room-node-secrets: {}
+  room-node-state: {}

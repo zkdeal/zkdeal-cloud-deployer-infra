@@ -1,0 +1,61 @@
+{
+	admin off
+	servers {
+		trusted_proxies static {$TRUSTED_PROXY_CIDRS}
+		client_ip_headers X-Forwarded-For X-Real-IP
+	}
+}
+
+{$PUBLIC_HOST} {
+	tls /run/secrets/tls.crt /run/secrets/tls.key
+	@private path /metrics /admission/* /indexer/* /queue/* /hosting/v1/admin/* /hosting/v1/indexer/* /hosting/v1/admissions/*
+	respond @private 404
+	request_body { max_size 2MB }
+
+	handle /docs {
+		redir /docs/ 308
+	}
+	handle_path /docs/* {
+		encode zstd gzip
+		reverse_proxy docs:8080
+	}
+
+	@sse path /hosting/v1/events
+	handle @sse {
+		header {
+			Cache-Control "no-store"
+			X-Accel-Buffering "no"
+			X-Request-ID "{http.request.uuid}"
+		}
+		reverse_proxy coordinator-writer:3000 {
+			flush_interval -1
+			header_up Last-Event-ID {http.request.header.Last-Event-ID}
+			header_up X-Request-ID {http.request.uuid}
+			transport http {
+				read_timeout 1h
+				write_timeout 1h
+				keepalive 2m
+			}
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	handle {
+		encode zstd gzip
+		header X-Request-ID "{http.request.uuid}"
+		reverse_proxy coordinator-writer:3000 {
+			header_up X-Request-ID {http.request.uuid}
+			lb_try_duration 2s
+			fail_duration 10s
+			max_fails 3
+		}
+	}
+}

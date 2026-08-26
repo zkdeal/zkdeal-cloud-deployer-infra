@@ -1,0 +1,37 @@
+services:
+  web3signer:
+    profiles: ["signer"]
+    image: ${WEB3SIGNER_IMAGE:-consensys/web3signer:26.4.2-distroless}
+    command:
+      - --http-listen-host=0.0.0.0
+      - --http-listen-port=9000
+      - --http-host-allowlist=web3signer,localhost,127.0.0.1
+      - --key-store-path=/var/lib/web3signer/keys
+      - eth1
+      - --chain-id=${CHAIN_ID:-31337}
+    volumes:
+      - ${WEB3SIGNER_CONFIG_DIR:?set a Web3Signer configuration directory}:/var/lib/web3signer/keys:ro
+    expose: ["9000"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    networks: [internal]
+
+  web3signer-health:
+    profiles: ["signer"]
+    image: ${CURL_IMAGE:-curlimages/curl:8.15.0}
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["until curl -fsS http://web3signer:9000/upcheck >/dev/null; do sleep 2; done; while :; do sleep 30; done"]
+    depends_on:
+      web3signer: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://web3signer:9000/upcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs: ["/tmp:size=8m,mode=1777"]
+    networks: [internal]

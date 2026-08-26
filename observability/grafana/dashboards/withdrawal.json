@@ -1,0 +1,21 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "panels": [
+    {"type":"stat","title":"Fenced auto-claimer up","targets":[{"expr":"zkdeal_withdrawal_worker_up","refId":"A"}],"gridPos":{"h":6,"w":6,"x":0,"y":0}},
+    {"type":"stat","title":"Seconds since successful claim pass","targets":[{"expr":"time() - zkdeal_withdrawal_worker_last_success_timestamp_seconds","refId":"A"}],"gridPos":{"h":6,"w":6,"x":6,"y":0}},
+    {"type":"timeseries","title":"Withdrawal worker runs","targets":[{"expr":"rate(zkdeal_withdrawal_worker_runs_total[5m])","refId":"A"}],"gridPos":{"h":6,"w":6,"x":12,"y":0}},
+    {"type":"timeseries","title":"Claim operations by bounded outcome","targets":[{"expr":"sum by (status) (rate(zkdeal_withdrawal_claim_operations_total[5m]))","refId":"A"}],"gridPos":{"h":6,"w":6,"x":18,"y":0}},
+    {"type":"stat","title":"Retryable errors","targets":[{"expr":"increase(zkdeal_withdrawal_claim_operations_total{status=\"errors\"}[10m])","refId":"A"}],"gridPos":{"h":7,"w":8,"x":0,"y":6}},
+    {"type":"stat","title":"Recovery-required claims","targets":[{"expr":"increase(zkdeal_withdrawal_claim_operations_total{status=\"recoveryRequired\"}[10m])","refId":"A"}],"gridPos":{"h":7,"w":8,"x":8,"y":6}},
+    {"type":"stat","title":"Already-claimed reconciliation","targets":[{"expr":"increase(zkdeal_withdrawal_claim_operations_total{status=\"alreadyClaimed\"}[10m])","refId":"A"}],"gridPos":{"h":7,"w":8,"x":16,"y":6}}
+  ],
+  "schemaVersion": 41,
+  "tags": ["zkdeal", "withdrawal", "auto-claimer", "owner-published"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "zkdeal withdrawal auto-claimer",
+  "uid": "zkdeal-withdrawal",
+  "version": 1
+}

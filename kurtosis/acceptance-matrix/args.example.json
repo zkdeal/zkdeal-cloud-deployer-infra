@@ -1,0 +1,47 @@
+{
+  "images": {
+    "acceptance_runner": "registry.invalid/zkdeal-owner-acceptance@sha256:REPLACE_WITH_64_HEX"
+  },
+  "candidate_id": "REPLACE_WITH_CANDIDATE_ID",
+  "hosted_integration_token": "sha256:REPLACE_WITH_64_HEX",
+  "topology_verification_file": "REPLACE_WITH_CANDIDATE_TOPOLOGY_VERIFICATION_JSON_PATH",
+  "topology_verification_sha256": "REPLACE_WITH_64_HEX",
+  "plan_file": "REPLACE_WITH_ACCEPTANCE_PLAN_JSON_PATH",
+  "plan_sha256": "REPLACE_WITH_64_HEX",
+  "auth_files": {
+    "admin": "REPLACE_WITH_EPHEMERAL_ADMIN_TOKEN_FILE",
+    "tenant_a": "REPLACE_WITH_EPHEMERAL_TENANT_A_TOKEN_FILE",
+    "tenant_b": "REPLACE_WITH_EPHEMERAL_TENANT_B_TOKEN_FILE",
+    "node_a": "REPLACE_WITH_EPHEMERAL_NODE_A_TOKEN_FILE",
+    "node_b": "REPLACE_WITH_EPHEMERAL_NODE_B_TOKEN_FILE",
+    "l1_liveness": "REPLACE_WITH_EPHEMERAL_L1_LIVENESS_TOKEN_FILE",
+    "l1_room": "REPLACE_WITH_EPHEMERAL_L1_ROOM_TOKEN_FILE",
+    "l1_aggregate": "REPLACE_WITH_EPHEMERAL_L1_AGGREGATE_TOKEN_FILE",
+    "l1_sponsor": "REPLACE_WITH_EPHEMERAL_L1_SPONSOR_TOKEN_FILE",
+    "withdrawal": "REPLACE_WITH_EPHEMERAL_WITHDRAWAL_TOKEN_FILE",
+    "fault_control": "REPLACE_WITH_EPHEMERAL_FAULT_CONTROL_TOKEN_FILE",
+    "backup_restore": "REPLACE_WITH_EPHEMERAL_BACKUP_RESTORE_TOKEN_FILE",
+    "failover_control": "REPLACE_WITH_EPHEMERAL_FAILOVER_CONTROL_TOKEN_FILE",
+    "failover_approval": "REPLACE_WITH_EPHEMERAL_FAILOVER_APPROVAL_TOKEN_FILE"
+  },
+  "commands": {
+    "reorg": "/opt/zkdeal-acceptance reorg --assert-rollback-and-retraction",
+    "rpc-disagreement": "/opt/zkdeal-acceptance rpc-disagreement --assert-fail-closed",
+    "split-brain-promotion": "/opt/zkdeal-acceptance split-brain-promotion --kill-active --assert-fence --assert-rto-seconds 300",
+    "database-object-restore": "/opt/zkdeal-acceptance database-object-restore --fresh-database --fresh-object-store --assert-hashes",
+    "sponsorship": "/opt/zkdeal-acceptance sponsorship --assert-tenant-isolation --assert-idempotency",
+    "queue-congestion": "/opt/zkdeal-acceptance queue-congestion --assert-fairness --assert-backoff",
+    "headless-restart": "/opt/zkdeal-acceptance headless-restart --assert-state-continuity --assert-single-writer",
+    "blob": "/opt/zkdeal-acceptance blob --assert-hash-binding --assert-restart-resume",
+    "partial-aggregate": "/opt/zkdeal-acceptance partial-aggregate --assert-member-outcomes",
+    "renewal": "/opt/zkdeal-acceptance renewal --assert-deadline-and-metering",
+    "withdrawal": "/opt/zkdeal-acceptance withdrawal --assert-finality --assert-replay-denial",
+    "rpc-load-shadow": "/opt/zkdeal-acceptance rpc-load-shadow --assert-latency-budget-ms 500 --assert-mismatch-rate 0",
+    "sse-load-shadow": "/opt/zkdeal-acceptance sse-load-shadow --assert-reconnect --assert-backpressure --assert-subscriber-cap",
+    "indexer-load-shadow": "/opt/zkdeal-acceptance indexer-load-shadow --assert-rollback --assert-lag-budget-blocks 8",
+    "admission-load-shadow": "/opt/zkdeal-acceptance admission-load-shadow --assert-wal-durable --assert-backpressure --assert-cap",
+    "scheduler-load-shadow": "/opt/zkdeal-acceptance scheduler-load-shadow --assert-mixed-tenant-fairness --assert-deadline-budget",
+    "projection-parity-shadow": "/opt/zkdeal-acceptance projection-parity-shadow --assert-projection-parity --assert-mismatch-rate 0",
+    "prover-agent-trace-join": "/opt/zkdeal-acceptance prover-agent-trace-join --assert-coordinator-agent-prover-heartbeat"
+  }
+}

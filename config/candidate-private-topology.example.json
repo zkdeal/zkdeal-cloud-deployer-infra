@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "REPLACE_WITH_LOWERCASE_CANDIDATE_ID",
+  "candidateDescriptorSha256": null,
+  "hostedIntegrationToken": null,
+  "ownerDatabaseSchema": null,
+  "platform": null,
+  "bridge": {
+    "mode": null,
+    "networkIdentity": null,
+    "privateOnly": false,
+    "lanExposed": true,
+    "removeAfterRun": false,
+    "candidateStackShared": false
+  },
+  "adapterCapabilities": {
+    "faultControl": {
+      "path": null,
+      "sha256": null,
+      "sourceSha256": null,
+      "image": null
+    },
+    "backupRestore": {
+      "path": null,
+      "sha256": null,
+      "sourceSha256": null,
+      "image": null
+    }
+  },
+  "endpoints": {
+    "coordinator": {"url": null, "workload": "coordinator-active"},
+    "indexer": {"url": null, "workload": "indexer"},
+    "queue": {"url": null, "workload": "coordinator-active"},
+    "headless": {"url": null, "workload": "headless-node"},
+    "l1_rpc_a": {"url": null, "workload": "l1-rpc-a"},
+    "l1_rpc_b": {"url": null, "workload": "l1-rpc-b"},
+    "fault": {"url": null, "workload": "fault-control"},
+    "backup": {"url": null, "workload": "backup-restore-control"},
+    "failover": {"url": null, "workload": "failover-provider"},
+    "prover": {"url": null, "workload": "prover"},
+    "logs": {"url": null, "workload": "logs"}
+  },
+  "workloads": {
+    "coordinator-active": {"kind": null, "imageKey": "coordinator", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "coordinator-standby": {"kind": null, "imageKey": "coordinator", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "indexer": {"kind": null, "imageKey": "coordinator", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "headless-node": {"kind": null, "imageKey": "headlessNode", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "active-witness-a": {"kind": null, "imageKey": "frontDoor", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "active-witness-b": {"kind": null, "imageKey": "frontDoor", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "l1-rpc-a": {"kind": "external", "imageKey": null, "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "l1-rpc-b": {"kind": "external", "imageKey": null, "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "fault-control": {"kind": null, "imageKey": "faultController", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "backup-restore-control": {"kind": null, "imageKey": "backupRestoreController", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "failover-provider": {"kind": null, "imageKey": "failoverProvider", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "prover": {"kind": null, "imageKey": "prover", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "logs": {"kind": null, "imageKey": "loki", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "postgres-primary": {"kind": null, "imageKey": "postgres", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null},
+    "postgres-standby": {"kind": null, "imageKey": "postgres", "imageRef": null, "runtimeId": null, "identity": null, "ready": false, "private": false, "chainId": null}
+  },
+  "databaseHa": {
+    "primaryWorkload": "postgres-primary",
+    "standbyWorkload": "postgres-standby",
+    "independentInstances": false,
+    "targetLsn": null,
+    "replayLsn": null,
+    "caughtUp": false,
+    "formerPrimaryFenced": false
+  },
+  "failoverControl": {
+    "activeCoordinatorId": null,
+    "standbyCoordinatorId": null,
+    "activeWitnesses": [
+      {"url": null, "workload": "active-witness-a"},
+      {"url": null, "workload": "active-witness-b"}
+    ],
+    "standbyHealth": {"url": null, "workload": "coordinator-standby"},
+    "promotionEndpoint": {"url": null, "workload": "coordinator-standby"},
+    "failureThreshold": 3,
+    "maxRtoSeconds": 300,
+    "independentWitnesses": false,
+    "scopedApprovalRequired": false,
+    "standbySignerlessBeforeFence": false
+  }
+}

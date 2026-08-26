@@ -1,0 +1,655 @@
+{
+  "components": {
+    "parameters": {
+      "IdempotencyKey": {
+        "description": "Must be permanently bound to the exact canonical request.",
+        "in": "header",
+        "name": "Idempotency-Key",
+        "required": true,
+        "schema": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "Request rejected permanently"
+      },
+      "Conflict": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "Idempotency key is bound to different bytes"
+      },
+      "Retryable": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "Provider asks for bounded retry"
+      },
+      "Unauthorized": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "Scoped provider token rejected"
+      },
+      "Unavailable": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "Provider unavailable; worker retains the durable lease outcome"
+      }
+    },
+    "schemas": {
+      "CapacityDemand": {
+        "additionalProperties": false,
+        "properties": {
+          "activeGpuResources": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "desiredGpuResources": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "earliestLatestStartAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "estimatedProofTimeMs": {
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "queuedBytes": {
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "queuedJobs": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reservedJobs": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "scaleDownSafe": {
+            "type": "boolean"
+          },
+          "schemaVersion": {
+            "const": 1
+          },
+          "signalId": {
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "staleProofProfiles": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "urgentJobs": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "windowStartedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "signalId",
+          "windowStartedAt",
+          "queuedJobs",
+          "queuedBytes",
+          "estimatedProofTimeMs",
+          "urgentJobs",
+          "reservedJobs",
+          "activeGpuResources",
+          "desiredGpuResources",
+          "staleProofProfiles",
+          "earliestLatestStartAt",
+          "scaleDownSafe"
+        ],
+        "type": "object"
+      },
+      "CapacityOperation": {
+        "additionalProperties": false,
+        "properties": {
+          "allocationId": {
+            "type": "string"
+          },
+          "deadlineAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "desiredState": {
+            "enum": [
+              "RESERVED",
+              "ACTIVE",
+              "RENEW",
+              "HANDOFF",
+              "RELEASED"
+            ]
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "previousProviderOperationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "providerNodeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "roomId": {
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "const": 1
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "allocationId",
+          "tenantId",
+          "roomId",
+          "desiredState",
+          "providerNodeId",
+          "deadlineAt",
+          "metadata",
+          "previousProviderOperationId"
+        ],
+        "type": "object"
+      },
+      "CapacityOperationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "type": "object"
+          },
+          "operationId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "providerNodeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retryAfterMs": {
+            "maximum": 3600000,
+            "minimum": 1000,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "state": {
+            "enum": [
+              "APPLIED",
+              "PENDING"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "operationId",
+          "evidence"
+        ],
+        "type": "object"
+      },
+      "Error": {
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "retryAfterMs": {
+            "maximum": 3600000,
+            "minimum": 1000,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "NodeLifecycleOperation": {
+        "additionalProperties": false,
+        "properties": {
+          "desiredState": {
+            "enum": [
+              "DRAINING",
+              "RETIRED"
+            ]
+          },
+          "nodeId": {
+            "pattern": "^0x[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "operationId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "previousProviderOperationId": {
+            "maxLength": 200,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "principalId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "schemaVersion": {
+            "const": 1
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "operationId",
+          "principalId",
+          "nodeId",
+          "desiredState",
+          "previousProviderOperationId"
+        ],
+        "type": "object"
+      },
+      "NodeLifecycleOperationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "properties": {
+              "desiredState": {
+                "enum": [
+                  "DRAINING",
+                  "RETIRED"
+                ]
+              },
+              "nodeId": {
+                "pattern": "^0x[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "selector": {
+                "enum": [
+                  "0xd7ceb78e",
+                  "0x13ca0607"
+                ]
+              },
+              "transactionHash": {
+                "pattern": "^0x[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "nodeId",
+              "desiredState",
+              "selector",
+              "transactionHash"
+            ],
+            "type": "object"
+          },
+          "operationId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "retryAfterMs": {
+            "maximum": 3600000,
+            "minimum": 1000,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "state": {
+            "enum": [
+              "APPLIED",
+              "PENDING"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "operationId",
+          "evidence"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Internal scoped interface used by the globally fenced capacity controller. Implementations may drive a cloud fleet, a RoomPool controller signer, or both, but must bind Idempotency-Key to the complete immutable request.",
+    "title": "zkdeal Capacity Provider",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "capacityProviderHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "ok": true
+                },
+                "schema": {
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Provider can accept operations"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/v1/capacity/demand": {
+      "post": {
+        "description": "Receives one immutable PostgreSQL-frozen window. scaleDownSafe=false forbids a provider-initiated reduction.",
+        "operationId": "acceptCapacityDemandSignal",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapacityDemand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "accepted": true,
+                  "providerRevision": "fleet-42"
+                },
+                "schema": {
+                  "properties": {
+                    "accepted": {
+                      "const": true
+                    },
+                    "providerRevision": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "accepted"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Signal durably accepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/Retryable"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/v1/capacity/operations": {
+      "post": {
+        "operationId": "applyCapacityOperation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "allocationId": "alloc-eu-001",
+                "deadlineAt": "2026-08-22T12:00:00.000Z",
+                "desiredState": "ACTIVE",
+                "metadata": {
+                  "region": "eu-west"
+                },
+                "previousProviderOperationId": null,
+                "providerNodeId": null,
+                "roomId": "7",
+                "schemaVersion": 1,
+                "tenantId": "tenant-a"
+              },
+              "schema": {
+                "$ref": "#/components/schemas/CapacityOperation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "applied": {
+                    "value": {
+                      "evidence": {
+                        "fleetRevision": "42"
+                      },
+                      "operationId": "provider-op-1",
+                      "providerNodeId": "gpu-eu-1",
+                      "state": "APPLIED"
+                    }
+                  },
+                  "pending": {
+                    "value": {
+                      "evidence": {},
+                      "operationId": "provider-op-1",
+                      "providerNodeId": null,
+                      "retryAfterMs": 5000,
+                      "state": "PENDING"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/CapacityOperationResult"
+                }
+              }
+            },
+            "description": "Applied or durably pending"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/Retryable"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/v1/nodes/{nodeId}/lifecycle": {
+      "post": {
+        "description": "Executes the irreversible RoomPool drain/retire lifecycle. APPLIED means the provider submitted the exact selector and returns transaction-bound evidence; the coordinator still waits for its finalized canonical event before changing the durable lifecycle state to APPLIED.",
+        "operationId": "applyNodeLifecycleOperation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "nodeId",
+            "required": true,
+            "schema": {
+              "pattern": "^0x[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "desiredState": "DRAINING",
+                "nodeId": "0x1111111111111111111111111111111111111111111111111111111111111111",
+                "operationId": "node-lifecycle-0123456789abcdef0123456789abcdef",
+                "previousProviderOperationId": null,
+                "principalId": "node-eu-1",
+                "schemaVersion": 1
+              },
+              "schema": {
+                "$ref": "#/components/schemas/NodeLifecycleOperation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "applied": {
+                    "value": {
+                      "evidence": {
+                        "desiredState": "DRAINING",
+                        "nodeId": "0x1111111111111111111111111111111111111111111111111111111111111111",
+                        "selector": "0xd7ceb78e",
+                        "transactionHash": "0x2222222222222222222222222222222222222222222222222222222222222222"
+                      },
+                      "operationId": "provider-node-op-1",
+                      "state": "APPLIED"
+                    }
+                  },
+                  "pending": {
+                    "value": {
+                      "evidence": {},
+                      "operationId": "provider-node-op-1",
+                      "retryAfterMs": 5000,
+                      "state": "PENDING"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/NodeLifecycleOperationResult"
+                }
+              }
+            },
+            "description": "Applied or durably pending"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/Retryable"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://capacity-provider.example"
+    }
+  ]
+}

@@ -1,0 +1,191 @@
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "zkdeal.fullname" . }}
+spec:
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }} }
+  endpoints:
+    - { port: http, path: /metrics, interval: {{ .Values.monitoring.serviceMonitor.interval }} }
+{{- end }}
+{{- if .Values.monitoring.prometheusRule.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "zkdeal.fullname" . }}
+spec:
+  groups:
+    - name: zkdeal.owner-published
+      rules:
+        - alert: ZkdealCoordinatorMetricsAbsent
+          expr: absent(zkdeal_process_uptime_seconds) == 1
+          for: 2m
+          labels: { severity: critical, service: coordinator, unit: boolean }
+          annotations:
+            summary: Hosted coordinator metrics are absent
+            runbook_url: /guides/monitoring-runbooks.md#zkdealcoordinatormetricsabsent
+        - alert: ZkdealHostedIndexerAbsent
+          expr: absent(zkdeal_hosted_worker_up{job="hosted-indexer"}) == 1
+          for: 2m
+          labels: { severity: critical, service: hosted-indexer, unit: boolean }
+          annotations:
+            summary: The owner-published hosted indexer worker is absent
+            runbook_url: /guides/monitoring-runbooks.md#zkdealhostedindexerabsent
+        - alert: ZkdealHostedReconcilerAbsent
+          expr: absent(zkdeal_hosted_worker_up{job="hosted-reconciler"}) == 1
+          for: 2m
+          labels: { severity: critical, service: hosted-reconciler, unit: boolean }
+          annotations:
+            summary: The owner-published hosted reconciler worker is absent
+            runbook_url: /guides/monitoring-runbooks.md#zkdealhostedreconcilerabsent
+        - alert: ZkdealHostedPublisherAbsent
+          expr: absent(zkdeal_blob_publisher_up{job="hosted-publisher"}) == 1
+          for: 2m
+          labels: { severity: critical, service: hosted-publisher, unit: boolean }
+          annotations:
+            summary: The fenced owner blob publisher is absent
+            runbook_url: /guides/monitoring-runbooks.md#zkdealhostedpublisherabsent
+        - alert: ZkdealBlobPublisherStale
+          expr: time() - zkdeal_blob_publisher_last_success_timestamp_seconds > 60
+          for: 2m
+          labels: { severity: critical, service: hosted-publisher, unit: seconds }
+          annotations:
+            summary: The blob publisher has not completed a fresh durable pass
+            runbook_url: /guides/monitoring-runbooks.md#zkdealblobpublisherstale
+        - alert: ZkdealBlobPublisherErrors
+          expr: increase(zkdeal_blob_publish_errors_total[10m]) > 0
+          labels: { severity: warning, service: hosted-publisher, unit: errors }
+          annotations:
+            summary: The blob publisher recorded retryable processing errors
+            runbook_url: /guides/monitoring-runbooks.md#zkdealblobpublishererrors
+        - alert: ZkdealPostFinalitySurprise
+          expr: increase(zkdeal_l1_post_finality_surprise_total[5m]) > 0
+          labels: { severity: critical, service: hosted-publisher, unit: events }
+          annotations:
+            summary: A finalized L1 publication moved to recovery-required
+            runbook_url: /guides/monitoring-runbooks.md#zkdealpostfinalitysurprise
+        - alert: ZkdealWithdrawalAutoClaimerAbsent
+          expr: absent(zkdeal_withdrawal_worker_up{job="hosted-auto-claimer"}) == 1
+          for: 2m
+          labels: { severity: critical, service: hosted-auto-claimer, unit: boolean }
+          annotations:
+            summary: The sole fenced withdrawal auto-claimer is absent
+            runbook_url: /guides/monitoring-runbooks.md#zkdealwithdrawalautoclaimerabsent
+        - alert: ZkdealWithdrawalAutoClaimerStale
+          expr: time() - zkdeal_withdrawal_worker_last_success_timestamp_seconds > 60
+          for: 2m
+          labels: { severity: critical, service: hosted-auto-claimer, unit: seconds }
+          annotations:
+            summary: The withdrawal auto-claimer has not completed a fresh durable pass
+            runbook_url: /guides/monitoring-runbooks.md#zkdealwithdrawalautoclaimerstale
+        - alert: ZkdealWithdrawalClaimErrors
+          expr: increase(zkdeal_withdrawal_claim_operations_total{status="errors"}[10m]) > 0
+          labels: { severity: warning, service: hosted-auto-claimer, unit: operations }
+          annotations:
+            summary: Withdrawal claims remain retryable after a worker pass
+            runbook_url: /guides/monitoring-runbooks.md#zkdealwithdrawalclaimerrors
+        - alert: ZkdealWithdrawalRecoveryRequired
+          expr: increase(zkdeal_withdrawal_claim_operations_total{status="recoveryRequired"}[5m]) > 0
+          labels: { severity: critical, service: hosted-auto-claimer, unit: operations }
+          annotations:
+            summary: A finalized withdrawal claim moved to recovery-required
+            runbook_url: /guides/monitoring-runbooks.md#zkdealwithdrawalrecoveryrequired
+        - alert: ZkdealCapacityControllerAbsent
+          expr: absent(zkdeal_capacity_worker_up{job="hosted-capacity"}) == 1
+          for: 2m
+          labels: { severity: critical, service: hosted-capacity, unit: boolean }
+          annotations: { summary: The sole fenced capacity controller is absent, runbook_url: /guides/monitoring-runbooks.md#zkdealcapacitycontrollerabsent }
+        - alert: ZkdealCapacityControllerStale
+          expr: time() - zkdeal_capacity_worker_last_success_timestamp_seconds{job="hosted-capacity"} > 60
+          for: 2m
+          labels: { severity: critical, service: hosted-capacity, unit: seconds }
+          annotations: { summary: The capacity controller has not completed a fresh durable pass, runbook_url: /guides/monitoring-runbooks.md#zkdealcapacitycontrollerstale }
+        - alert: ZkdealCapacityOperationErrors
+          expr: sum(increase(zkdeal_capacity_operations_total{job="hosted-capacity",status=~"failures|terminal"}[10m])) > 0
+          labels: { severity: warning, service: hosted-capacity, unit: operations }
+          annotations: { summary: Capacity provider operations failed or require operator action, runbook_url: /guides/monitoring-runbooks.md#zkdealcapacityoperationerrors }
+        - alert: ZkdealCapacityDeadlineRisk
+          expr: increase(zkdeal_capacity_operations_total{job="hosted-capacity",status="deadlineRisk"}[5m]) > 0
+          labels: { severity: critical, service: hosted-capacity, unit: operations }
+          annotations: { summary: Canonical deadline urgency cannot be satisfied by current capacity, runbook_url: /guides/monitoring-runbooks.md#zkdealcapacitydeadlinerisk }
+        - alert: ZkdealRoomNodeAbsent
+          expr: absent(zkdeal_room_node_up{job="headless-room-node"}) == 1
+          for: 2m
+          labels: { severity: critical, service: headless-room-node, unit: boolean }
+          annotations: { summary: The owner-published headless room-node is absent, runbook_url: /guides/monitoring-runbooks.md#zkdealroomnodeabsent }
+        - alert: ZkdealRoomNodeNotReady
+          expr: min(zkdeal_room_node_ready{job="headless-room-node"}) < 1
+          for: 2m
+          labels: { severity: critical, service: headless-room-node, unit: boolean }
+          annotations: { summary: A headless room-node fails restart attachment finality or persistence readiness, runbook_url: /guides/monitoring-runbooks.md#zkdealroomnodenotready }
+        - alert: ZkdealRoomNodeControlErrors
+          expr: sum(increase(zkdeal_room_node_control_operations_total{status="error"}[10m])) > 0
+          labels: { severity: warning, service: headless-room-node, unit: operations }
+          annotations: { summary: A headless room-node control lifecycle operation failed, runbook_url: /guides/monitoring-runbooks.md#zkdealroomnodecontrolerrors }
+        - alert: ZkdealRoomNodeFinalityUnavailable
+          expr: max(zkdeal_room_node_l1_finality{state="unavailable"}) > 0
+          for: 2m
+          labels: { severity: critical, service: headless-room-node, unit: boolean }
+          annotations: { summary: A headless room-node cannot establish L1 finality, runbook_url: /guides/monitoring-runbooks.md#zkdealroomnodefinalityunavailable }
+        - alert: ZkdealHostedWorkerStale
+          expr: time() - zkdeal_hosted_worker_last_success_timestamp_seconds > 60
+          for: 2m
+          labels: { severity: critical, service: hosted-worker, unit: seconds }
+          annotations:
+            summary: A delegated hosted worker has not completed a fresh run
+            runbook_url: /guides/monitoring-runbooks.md#zkdealhostedworkerstale
+    - name: zkdeal.required-owner-contract
+      rules:
+        - alert: ZkdealL1FinalityMetricContractMissing
+          expr: absent(zkdeal_l1_quorum_healthy) == 1
+          for: 10m
+          labels: { severity: critical, service: l1-finality, unit: boolean }
+          annotations: { summary: Required L1 finality metrics are unpublished, runbook_url: /guides/monitoring-runbooks.md#zkdeall1finalitymetriccontractmissing }
+        - alert: ZkdealIndexerMetricContractMissing
+          expr: absent(zkdeal_indexer_lag_blocks) == 1
+          for: 10m
+          labels: { severity: critical, service: indexer, unit: blocks }
+          annotations: { summary: Required canonical lag metrics are unpublished, runbook_url: /guides/monitoring-runbooks.md#zkdealindexermetriccontractmissing }
+        - alert: ZkdealAdmissionWalMetricContractMissing
+          expr: absent(zkdeal_admission_wal_records) == 1
+          for: 10m
+          labels: { severity: critical, service: admission-wal, unit: records }
+          annotations: { summary: Required admission WAL metrics are unpublished, runbook_url: /guides/monitoring-runbooks.md#zkdealadmissionwalmetriccontractmissing }
+        - alert: ZkdealRoomMetricContractMissing
+          expr: absent(zkdeal_rooms_by_state) == 1
+          for: 10m
+          labels: { severity: critical, service: rooms, unit: rooms }
+          annotations: { summary: Required room lifecycle metrics are unpublished, runbook_url: /guides/monitoring-runbooks.md#zkdealroommetriccontractmissing }
+        - alert: ZkdealHostedQueueMetricContractMissing
+          expr: absent(zkdeal_hosted_queue_jobs_waiting) == 1
+          for: 10m
+          labels: { severity: critical, service: hosted-queue, unit: jobs }
+          annotations: { summary: Hosted queue metrics are unpublished, runbook_url: /guides/monitoring-runbooks.md#zkdealhostedqueuemetriccontractmissing }
+        - alert: ZkdealTenantBillingMetricContractMissing
+          expr: absent(zkdeal_tenant_usage_ledger_lag_seconds) == 1
+          for: 10m
+          labels: { severity: critical, service: tenant-billing, unit: seconds }
+          annotations: { summary: Required tenant billing metrics are unpublished, runbook_url: /guides/monitoring-runbooks.md#zkdealtenantbillingmetriccontractmissing }
+        - alert: ZkdealStorageMetricContractMissing
+          expr: absent(zkdeal_postgres_wal_replay_lag_seconds) == 1
+          for: 10m
+          labels: { severity: critical, service: storage, unit: seconds }
+          annotations: { summary: Required storage metrics are unpublished, runbook_url: /guides/monitoring-runbooks.md#zkdealstoragemetriccontractmissing }
+        - alert: ZkdealSponsorshipMetricContractMissing
+          expr: absent(zkdeal_sponsorship_balance_wei) == 1
+          for: 10m
+          labels: { severity: critical, service: sponsorship, unit: wei }
+          annotations: { summary: Required sponsorship metrics are unpublished, runbook_url: /guides/monitoring-runbooks.md#zkdealsponsorshipmetriccontractmissing }
+        - alert: ZkdealBlobMetricContractMissing
+          expr: absent(zkdeal_blob_archive_pending) == 1
+          for: 10m
+          labels: { severity: critical, service: blob-archive, unit: blobs }
+          annotations: { summary: Required blob archive metrics are unpublished, runbook_url: /guides/monitoring-runbooks.md#zkdealblobmetriccontractmissing }
+        - alert: ZkdealAggregateMetricContractMissing
+          expr: absent(zkdeal_partial_aggregate_pending) == 1
+          for: 10m
+          labels: { severity: critical, service: aggregate, unit: aggregates }
+          annotations: { summary: Required partial aggregate metrics are unpublished, runbook_url: /guides/monitoring-runbooks.md#zkdealaggregatemetriccontractmissing }
+{{- end }}

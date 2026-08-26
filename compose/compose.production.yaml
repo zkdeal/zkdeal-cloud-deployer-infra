@@ -1,0 +1,109 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE_DIGEST:?set PostgreSQL repository@sha256 digest}
+  postgres-standby:
+    image: ${POSTGRES_IMAGE_DIGEST:?set PostgreSQL repository@sha256 digest}
+  postgres-ha-ready:
+    image: ${POSTGRES_IMAGE_DIGEST:?set PostgreSQL repository@sha256 digest}
+  minio:
+    image: ${MINIO_IMAGE_DIGEST:?set MinIO repository@sha256 digest}
+  minio-init:
+    image: ${MINIO_CLIENT_IMAGE_DIGEST:?set MinIO client repository@sha256 digest}
+  coordinator:
+    image: ${COORDINATOR_IMAGE_DIGEST:?set coordinator repository@sha256 digest}
+    build: !reset null
+    ports: !reset []
+  coordinator-standby:
+    image: ${COORDINATOR_IMAGE_DIGEST:?set coordinator repository@sha256 digest}
+    build: !reset null
+  indexer:
+    image: ${COORDINATOR_IMAGE_DIGEST:?set coordinator repository@sha256 digest}
+    build: !reset null
+  reconciler:
+    image: ${COORDINATOR_IMAGE_DIGEST:?set coordinator repository@sha256 digest}
+    build: !reset null
+  publisher:
+    image: ${COORDINATOR_IMAGE_DIGEST:?set coordinator repository@sha256 digest}
+    build: !reset null
+  auto-claimer:
+    image: ${COORDINATOR_IMAGE_DIGEST:?set coordinator repository@sha256 digest}
+    build: !reset null
+  capacity-controller:
+    image: ${COORDINATOR_IMAGE_DIGEST:?set coordinator repository@sha256 digest}
+    build: !reset null
+  promotion-controller:
+    image: ${PROMOTION_CONTROLLER_IMAGE_DIGEST:?set promotion controller repository@sha256 digest}
+    build: !reset null
+  failover-provider-docker:
+    image: ${FAILOVER_PROVIDER_IMAGE_DIGEST:?set failover provider repository@sha256 digest}
+    build: !reset null
+  standby-signer-authority:
+    image: ${NGINX_IMAGE_DIGEST:-nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10}
+  headless-node-secret-init:
+    image: ${HEADLESS_NODE_IMAGE_DIGEST:?set headless room-node repository@sha256 digest}
+    build: !reset null
+  headless-node:
+    image: ${HEADLESS_NODE_IMAGE_DIGEST:?set headless room-node repository@sha256 digest}
+    build: !reset null
+  queue:
+    # Compose must still resolve an image for this inherited, inactive service.
+    # Reuse the immutable coordinator artifact; no standalone queue artifact is
+    # part of the production candidate or pulled as an independent authority.
+    image: ${COORDINATOR_IMAGE_DIGEST:?set coordinator repository@sha256 digest}
+    build: !reset null
+    # The file-backed standalone queue is a local-development surface only.
+    # Hosted proving is served by the coordinator's PostgreSQL/MinIO API.
+    profiles: ["never-production"]
+    command: !reset []
+    ports: !reset []
+  docs:
+    image: ${DOCS_IMAGE_DIGEST:?set docs repository@sha256 digest}
+    build: !reset null
+  front-door:
+    image: ${NGINX_IMAGE_DIGEST:-nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10}
+  prover:
+    image: ${PROVER_IMAGE_DIGEST:?set prover repository@sha256 digest}
+  agent:
+    image: ${AGENT_IMAGE_DIGEST:?set agent repository@sha256 digest}
+    build: !reset null
+    command: ["node", "/app/agent/agent.js"]
+    working_dir: /app
+    environment:
+      QUEUE_URL: http://coordinator:3000
+      ZKDEAL_QUEUE_NODE_TOKEN: ${ZKDEAL_QUEUE_NODE_TOKEN:?set the prove-agent scoped queue token}
+      NODE_ID: ${NODE_ID:?set the bound provider node ID}
+      PROVER_URL: http://prover:8080
+      ZKDEAL_PROVER_TOKEN: ${ZKDEAL_PROVER_TOKEN:?set the prover route token}
+      ZKDEAL_AGENT_GPU: "1"
+      ROOM_POOL: ${ROOM_POOL:?set the deployed RoomPool address}
+      NODE_LIVENESS_COORDINATOR_URL: http://coordinator:3000
+      NODE_LIVENESS_COORDINATOR_AUTH_TOKEN: ${NODE_LIVENESS_COORDINATOR_AUTH_TOKEN:?set a service principal carrying only l1-liveness}
+      NODE_LIVENESS_ACCOUNT: ${NODE_LIVENESS_ACCOUNT:?set the server-bound liveness account}
+      L1_CHAIN_ID: ${CHAIN_ID:?set chain ID}
+      # Official Compose reset tags remove every legacy direct-sender input
+      # inherited from the explicit local-development service.
+      L1_RPC_URL: !reset null
+      NODE_LIVENESS_SIGNER_URL: !reset null
+      NODE_LIVENESS_SIGNER_AUTH_TOKEN: !reset null
+      NODE_LIVENESS_DEV_MODE: !reset null
+      NODE_LIVENESS_DEV_PRIVATE_KEY: !reset null
+      NODE_SERVICE_KEY: !reset null
+    depends_on: !override
+      coordinator: { condition: service_healthy }
+      prover: { condition: service_healthy }
+    networks: !override [internal]
+  agent-stub:
+    profiles: ["never-production"]
+    build: !reset null
+  prometheus:
+    image: ${PROMETHEUS_IMAGE_DIGEST:-prom/prometheus@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996}
+  grafana:
+    image: ${GRAFANA_IMAGE_DIGEST:-grafana/grafana@sha256:6ac590e7cabc2fbe8d7b8fc1ce9c9f0582177b334e0df9c927ebd9670469440f}
+  alertmanager:
+    image: ${ALERTMANAGER_IMAGE_DIGEST:-prom/alertmanager@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba}
+  loki:
+    image: ${LOKI_IMAGE_DIGEST:-grafana/loki@sha256:3165cecce301ce5b9b6e3530284b080934a05cd5cafac3d3d82edcb887b45ecd}
+  promtail:
+    image: ${PROMTAIL_IMAGE_DIGEST:-grafana/promtail@sha256:698c3357886c886bb9a862da36062e130c20bf359d956148e67ee36141ef6f17}
+  webhook-sink:
+    image: ${PYTHON_IMAGE_DIGEST:-python@sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d}

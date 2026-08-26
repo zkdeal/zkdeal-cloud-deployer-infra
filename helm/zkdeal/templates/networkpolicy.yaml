@@ -1,0 +1,504 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-default-deny
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }} }
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-dns-egress
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }} }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {{ toYaml .Values.networkPolicy.dnsNamespaceSelector | nindent 12 }}
+          podSelector: {{ toYaml .Values.networkPolicy.dnsPodSelector | nindent 12 }}
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+{{- $active := .Values.components.coordinatorActive }}
+{{- if $active.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-front-door-to-coordinator
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: coordinator-active
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {{ toYaml .Values.networkPolicy.ingressNamespaceSelector | nindent 12 }}
+          podSelector: {{ toYaml .Values.networkPolicy.ingressPodSelector | nindent 12 }}
+      ports: [{ protocol: TCP, port: {{ $active.port }} }]
+{{- end }}
+{{- range $name, $component := .Values.components }}
+{{- if and $component.enabled (ne $component.role "prover-agent") }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-monitor-{{ kebabcase $name }}
+  labels: {{ include "zkdeal.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ kebabcase $name }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {{ toYaml $.Values.networkPolicy.monitoringNamespaceSelector | nindent 12 }}
+      podSelector: {{ toYaml $.Values.networkPolicy.monitoringPodSelector | nindent 12 }}
+      ports: [{ protocol: TCP, port: {{ $component.port }} }]
+{{- end }}
+{{- if and $component.enabled $component.allowExternalEgress (gt (len $.Values.networkPolicy.externalEgressCidrs) 0) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-external-{{ kebabcase $name }}
+  labels: {{ include "zkdeal.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ kebabcase $name }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        {{- range $.Values.networkPolicy.externalEgressCidrs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports:
+        {{- range $.Values.networkPolicy.externalEgressPorts }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+{{- end }}
+{{- end }}
+{{- range $flow := .Values.networkPolicy.internalFlows }}
+{{- $from := index $.Values.components $flow.from }}
+{{- $to := index $.Values.components $flow.to }}
+{{- if and $from.enabled $to.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $flow.from }}-to-{{ kebabcase $flow.to }}
+  labels: {{ include "zkdeal.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ kebabcase $flow.from }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ $.Release.Name }}
+              app.kubernetes.io/component: {{ kebabcase $flow.to }}
+      ports: [{ protocol: TCP, port: {{ $flow.port }} }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $flow.to }}-from-{{ kebabcase $flow.from }}
+  labels: {{ include "zkdeal.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ kebabcase $flow.to }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ $.Release.Name }}
+              app.kubernetes.io/component: {{ kebabcase $flow.from }}
+      ports: [{ protocol: TCP, port: {{ $flow.port }} }]
+{{- end }}
+{{- end }}
+{{- end }}
+{{- range $name, $component := .Values.components }}
+{{- if and $component.enabled $component.signerRole }}
+{{- $role := index $.Values.externalServices.signerRoles $component.signerRole }}
+{{- if gt (len $role.cidrs) 0 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $name }}-to-signer-{{ kebabcase $component.signerRole }}
+  labels: {{ include "zkdeal.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ kebabcase $name }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        {{- range $role.cidrs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports: [{ protocol: TCP, port: 443 }]
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $livenessRole := index .Values.externalServices.signerRoles "liveness" }}
+{{- if and .Values.components.coordinatorActive.enabled (gt (len $livenessRole.cidrs) 0) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-coordinator-active-to-signer-liveness
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: coordinator-active
+  policyTypes: [Egress]
+  egress:
+    - to:
+        {{- range $livenessRole.cidrs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports: [{ protocol: TCP, port: 443 }]
+{{- end }}
+{{- range $jobName, $flow := .Values.networkPolicy.operationalFlows }}
+{{- $enabled := false }}
+{{- if eq $jobName "backup" }}{{- $enabled = $.Values.operations.backup.enabled }}{{- end }}
+{{- if eq $jobName "restore" }}{{- $enabled = $.Values.operations.restore.enabled }}{{- end }}
+{{- if eq $jobName "migration" }}{{- $enabled = $.Values.migration.enabled }}{{- end }}
+{{- if eq $jobName "promotion" }}{{- $enabled = and $.Values.operations.promotion.enabled $.Values.operations.promotion.manualJobEnabled }}{{- end }}
+{{- if eq $jobName "promotionController" }}{{- $enabled = $.Values.operations.promotion.controller.enabled }}{{- end }}
+{{- if and $enabled (gt (len $flow.cidrs) 0) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $jobName }}-egress
+  labels: {{ include "zkdeal.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ kebabcase $jobName }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        {{- range $flow.cidrs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports:
+        {{- range $flow.ports }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+{{- end }}
+{{- end }}
+{{- if and .Values.operations.promotion.enabled .Values.operations.promotion.manualJobEnabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-promotion-to-coordinator
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: promotion
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: coordinator-standby
+      ports: [{ protocol: TCP, port: {{ .Values.components.coordinatorStandby.port }} }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-standby-from-promotion
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: coordinator-standby
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: promotion
+      ports: [{ protocol: TCP, port: {{ .Values.components.coordinatorStandby.port }} }]
+{{- end }}
+{{- if and .Values.operations.promotion.enabled .Values.operations.promotion.controller.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-promotion-controller-to-standby
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: promotion-controller
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: coordinator-standby
+      ports: [{ protocol: TCP, port: {{ .Values.components.coordinatorStandby.port }} }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-standby-from-promotion-controller
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: coordinator-standby
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: promotion-controller
+      ports: [{ protocol: TCP, port: {{ .Values.components.coordinatorStandby.port }} }]
+{{- end }}
+{{- $provider := .Values.operations.promotion.provider }}
+{{- if and .Values.networkPolicy.enabled .Values.operations.promotion.enabled .Values.operations.promotion.controller.enabled $provider.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-promotion-controller-to-failover-provider
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: promotion-controller
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: failover-provider
+      ports: [{ protocol: TCP, port: {{ $provider.servicePort }} }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-failover-provider-from-promotion-controller
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: failover-provider
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: promotion-controller
+      ports: [{ protocol: TCP, port: {{ $provider.servicePort }} }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-failover-provider-external-egress
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: failover-provider
+  policyTypes: [Egress]
+  egress:
+    - to:
+        {{- range .Values.networkPolicy.operationalFlows.failoverProvider.cidrs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports:
+        {{- range .Values.networkPolicy.operationalFlows.failoverProvider.ports }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-failover-provider-to-standby
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: failover-provider
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: coordinator-standby
+      ports: [{ protocol: TCP, port: {{ .Values.components.coordinatorStandby.port }} }]
+    {{- if .Values.components.indexer.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: indexer
+      ports: [{ protocol: TCP, port: {{ .Values.components.indexer.port }} }]
+    {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-standby-from-failover-provider
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: coordinator-standby
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: failover-provider
+      ports: [{ protocol: TCP, port: {{ .Values.components.coordinatorStandby.port }} }]
+{{- if .Values.components.indexer.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-indexer-from-failover-provider
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: indexer
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: failover-provider
+      ports: [{ protocol: TCP, port: {{ .Values.components.indexer.port }} }]
+{{- end }}
+{{- if $provider.signerAuthority.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-failover-provider-to-signer-authority
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: failover-provider
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: standby-signer-authority
+      ports: [{ protocol: TCP, port: 8080 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-signer-authority-from-failover-provider
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: standby-signer-authority
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: failover-provider
+      ports: [{ protocol: TCP, port: 8080 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-signer-authority-egress
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: standby-signer-authority
+  policyTypes: [Egress]
+  egress:
+    - to:
+        {{- range .Values.networkPolicy.operationalFlows.signerAuthority.cidrs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports:
+        {{- range .Values.networkPolicy.operationalFlows.signerAuthority.ports }}
+        - { protocol: TCP, port: {{ . }} }
+        {{- end }}
+{{- end }}
+{{- if .Values.components.coordinatorStandby.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-front-door-to-standby-coordinator
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: coordinator-standby
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {{ toYaml .Values.networkPolicy.ingressNamespaceSelector | nindent 12 }}
+          podSelector: {{ toYaml .Values.networkPolicy.ingressPodSelector | nindent 12 }}
+      ports: [{ protocol: TCP, port: {{ .Values.components.coordinatorStandby.port }} }]
+{{- end }}
+{{- end }}

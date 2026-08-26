@@ -1,0 +1,146 @@
+x-web3signer-production: &web3signer-production
+  profiles: ["signer-production"]
+  image: ${WEB3SIGNER_IMAGE_DIGEST:-consensys/web3signer@sha256:48d05fa329615527b1c4f94b0a63b376540b143cd0d93fa3f56f584d81ddc9ce}
+  expose: ["9000"]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  read_only: true
+  tmpfs: ["/tmp:size=64m,mode=1777"]
+  restart: unless-stopped
+
+x-web3signer-health: &web3signer-health
+  profiles: ["signer-production"]
+  image: ${CURL_IMAGE_DIGEST:-curlimages/curl@sha256:4026b29997dc7c823b51c164b71e2b51e0fd95cce4601f78202c513d97da2922}
+  entrypoint: ["/bin/sh", "-ec"]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  read_only: true
+  tmpfs: ["/tmp:size=8m,mode=1777"]
+  restart: unless-stopped
+
+services:
+  coordinator:
+    environment:
+      SIGNER_URL: http://web3signer-operations:9000
+      SIGNER_ROLE: operations-settlement
+      NODE_LIVENESS_SIGNER_URL: http://web3signer-liveness:9000
+      NODE_LIVENESS_SIGNER_ADDRESS: ${NODE_LIVENESS_ACCOUNT:?set the server-bound liveness account}
+      NODE_LIVENESS_SIGNER_AUTH_TOKEN: ${NODE_LIVENESS_SIGNER_AUTH_TOKEN:?set the coordinator liveness-signer token}
+    networks: [internal, egress, signer-operations, signer-liveness]
+    depends_on:
+      web3signer-operations-health: { condition: service_healthy }
+      web3signer-liveness-health: { condition: service_healthy }
+
+  publisher:
+    environment:
+      L1_SIGNER_URL: http://web3signer-blob:9000
+    networks: [internal, egress, signer-blob]
+    depends_on:
+      web3signer-blob-health: { condition: service_healthy }
+
+  auto-claimer:
+    environment:
+      WITHDRAWAL_SIGNER_URL: http://web3signer-withdrawal:9000
+    networks: [internal, egress, signer-withdrawal]
+    depends_on:
+      web3signer-withdrawal-health: { condition: service_healthy }
+
+  web3signer-liveness:
+    <<: *web3signer-production
+    command: ["--http-listen-host=0.0.0.0", "--http-listen-port=9000", "--http-host-allowlist=web3signer-liveness", "--key-store-path=/var/lib/web3signer/keys", "eth1", "--chain-id=${CHAIN_ID:?set chain ID}"]
+    volumes: ["${WEB3SIGNER_LIVENESS_CONFIG_DIR:?set the liveness signer configuration directory}:/var/lib/web3signer/keys:ro"]
+    networks: [signer-liveness]
+
+  web3signer-liveness-health:
+    <<: *web3signer-health
+    command: ["until curl -fsS http://web3signer-liveness:9000/upcheck >/dev/null; do sleep 2; done; while :; do sleep 30; done"]
+    healthcheck: { test: ["CMD", "curl", "-fsS", "http://web3signer-liveness:9000/upcheck"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { web3signer-liveness: { condition: service_started } }
+    networks: [signer-liveness]
+
+  web3signer-operations:
+    <<: *web3signer-production
+    command: ["--http-listen-host=0.0.0.0", "--http-listen-port=9000", "--http-host-allowlist=web3signer-operations", "--key-store-path=/var/lib/web3signer/keys", "eth1", "--chain-id=${CHAIN_ID:?set chain ID}"]
+    volumes: ["${WEB3SIGNER_OPERATIONS_CONFIG_DIR:?set the operations signer configuration directory}:/var/lib/web3signer/keys:ro"]
+    networks: [signer-operations]
+
+  web3signer-operations-health:
+    <<: *web3signer-health
+    command: ["until curl -fsS http://web3signer-operations:9000/upcheck >/dev/null; do sleep 2; done; while :; do sleep 30; done"]
+    healthcheck: { test: ["CMD", "curl", "-fsS", "http://web3signer-operations:9000/upcheck"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { web3signer-operations: { condition: service_started } }
+    networks: [signer-operations]
+
+  web3signer-payout:
+    <<: *web3signer-production
+    command: ["--http-listen-host=0.0.0.0", "--http-listen-port=9000", "--http-host-allowlist=web3signer-payout", "--key-store-path=/var/lib/web3signer/keys", "eth1", "--chain-id=${CHAIN_ID:?set chain ID}"]
+    volumes: ["${WEB3SIGNER_PAYOUT_CONFIG_DIR:?set the payout signer configuration directory}:/var/lib/web3signer/keys:ro"]
+    networks: [signer-payout]
+
+  web3signer-payout-health:
+    <<: *web3signer-health
+    command: ["until curl -fsS http://web3signer-payout:9000/upcheck >/dev/null; do sleep 2; done; while :; do sleep 30; done"]
+    healthcheck: { test: ["CMD", "curl", "-fsS", "http://web3signer-payout:9000/upcheck"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { web3signer-payout: { condition: service_started } }
+    networks: [signer-payout]
+
+  web3signer-finality:
+    <<: *web3signer-production
+    command: ["--http-listen-host=0.0.0.0", "--http-listen-port=9000", "--http-host-allowlist=web3signer-finality", "--key-store-path=/var/lib/web3signer/keys", "eth1", "--chain-id=${CHAIN_ID:?set chain ID}"]
+    volumes: ["${WEB3SIGNER_FINALITY_CONFIG_DIR:?set the finality signer configuration directory}:/var/lib/web3signer/keys:ro"]
+    networks: [signer-finality]
+
+  web3signer-finality-health:
+    <<: *web3signer-health
+    command: ["until curl -fsS http://web3signer-finality:9000/upcheck >/dev/null; do sleep 2; done; while :; do sleep 30; done"]
+    healthcheck: { test: ["CMD", "curl", "-fsS", "http://web3signer-finality:9000/upcheck"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { web3signer-finality: { condition: service_started } }
+    networks: [signer-finality]
+
+  web3signer-sponsor:
+    <<: *web3signer-production
+    command: ["--http-listen-host=0.0.0.0", "--http-listen-port=9000", "--http-host-allowlist=web3signer-sponsor", "--key-store-path=/var/lib/web3signer/keys", "eth1", "--chain-id=${CHAIN_ID:?set chain ID}"]
+    volumes: ["${WEB3SIGNER_SPONSOR_CONFIG_DIR:?set the sponsor signer configuration directory}:/var/lib/web3signer/keys:ro"]
+    networks: [signer-sponsor]
+
+  web3signer-sponsor-health:
+    <<: *web3signer-health
+    command: ["until curl -fsS http://web3signer-sponsor:9000/upcheck >/dev/null; do sleep 2; done; while :; do sleep 30; done"]
+    healthcheck: { test: ["CMD", "curl", "-fsS", "http://web3signer-sponsor:9000/upcheck"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { web3signer-sponsor: { condition: service_started } }
+    networks: [signer-sponsor]
+
+  web3signer-withdrawal:
+    <<: *web3signer-production
+    command: ["--http-listen-host=0.0.0.0", "--http-listen-port=9000", "--http-host-allowlist=web3signer-withdrawal", "--key-store-path=/var/lib/web3signer/keys", "eth1", "--chain-id=${CHAIN_ID:?set chain ID}"]
+    volumes: ["${WEB3SIGNER_WITHDRAWAL_CONFIG_DIR:?set the withdrawal signer configuration directory}:/var/lib/web3signer/keys:ro"]
+    networks: [signer-withdrawal]
+
+  web3signer-withdrawal-health:
+    <<: *web3signer-health
+    command: ["until curl -fsS http://web3signer-withdrawal:9000/upcheck >/dev/null; do sleep 2; done; while :; do sleep 30; done"]
+    healthcheck: { test: ["CMD", "curl", "-fsS", "http://web3signer-withdrawal:9000/upcheck"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { web3signer-withdrawal: { condition: service_started } }
+    networks: [signer-withdrawal]
+
+  web3signer-blob:
+    <<: *web3signer-production
+    command: ["--http-listen-host=0.0.0.0", "--http-listen-port=9000", "--http-host-allowlist=web3signer-blob", "--key-store-path=/var/lib/web3signer/keys", "eth1", "--chain-id=${CHAIN_ID:?set chain ID}"]
+    volumes: ["${WEB3SIGNER_BLOB_CONFIG_DIR:?set the blob-publisher signer configuration directory}:/var/lib/web3signer/keys:ro"]
+    networks: [signer-blob]
+
+  web3signer-blob-health:
+    <<: *web3signer-health
+    command: ["until curl -fsS http://web3signer-blob:9000/upcheck >/dev/null; do sleep 2; done; while :; do sleep 30; done"]
+    healthcheck: { test: ["CMD", "curl", "-fsS", "http://web3signer-blob:9000/upcheck"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { web3signer-blob: { condition: service_started } }
+    networks: [signer-blob]
+
+networks:
+  signer-liveness: { internal: true }
+  signer-operations: { internal: true }
+  signer-payout: { internal: true }
+  signer-finality: { internal: true }
+  signer-sponsor: { internal: true }
+  signer-withdrawal: { internal: true }
+  signer-blob: { internal: true }

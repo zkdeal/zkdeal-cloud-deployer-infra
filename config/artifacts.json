@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "umbrellaRoot": "../..",
+  "artifacts": [
+    {
+      "id": "coordinator-dockerfile",
+      "owner": "web2-api",
+      "path": "web2-api/server/Dockerfile",
+      "kind": "dockerfile",
+      "required": true
+    },
+    {
+      "id": "coordinator-routes",
+      "owner": "web2-api",
+      "path": "web2-api/server/src",
+      "kind": "typescript-routes",
+      "required": true
+    },
+    {
+      "id": "hosted-service-capabilities",
+      "owner": "web2-api",
+      "path": "web2-api/server/capabilities/hosted-service.json",
+      "kind": "service-capability-manifest",
+      "required": true
+    },
+    {
+      "id": "capacity-provider-openapi",
+      "owner": "web2-api",
+      "path": "web2-api/server/capabilities/capacity-provider-v1.openapi.json",
+      "kind": "openapi",
+      "required": true
+    },
+    {
+      "id": "hosting-runtime-openapi",
+      "owner": "web2-api",
+      "path": "web2-api/server/capabilities/hosting-v1.openapi.json",
+      "kind": "openapi",
+      "required": true
+    },
+    {
+      "id": "room-batch-hosted-integration-evidence",
+      "owner": "web2-api+app-node+prover-node",
+      "path": "web2-api/server/capabilities/room-batch-hosted-integration-v1.json",
+      "kind": "acceptance-evidence-manifest",
+      "required": true
+    },
+    {
+      "id": "headless-room-node-dockerfile",
+      "owner": "app-node",
+      "path": "app-node/packages/room-node/Dockerfile",
+      "kind": "dockerfile",
+      "required": true
+    },
+    {
+      "id": "headless-room-node-capabilities",
+      "owner": "app-node",
+      "path": "app-node/packages/room-node/capabilities/room-node.json",
+      "kind": "service-capability-manifest",
+      "required": true
+    },
+    {
+      "id": "prover-agent-source",
+      "owner": "prover-node",
+      "path": "prover-node/agent/src",
+      "kind": "typescript-runtime-source",
+      "required": true
+    },
+    {
+      "id": "prover-agent-package",
+      "owner": "prover-node",
+      "path": "prover-node/agent/package.json",
+      "kind": "package-manifest",
+      "required": true
+    },
+    {
+      "id": "prover-agent-liveness-capabilities",
+      "owner": "prover-node",
+      "path": "prover-node/agent/liveness-capability.json",
+      "kind": "service-capability-manifest",
+      "required": true
+    },
+    {
+      "id": "prover-agent-trace-capabilities",
+      "owner": "prover-node",
+      "path": "prover-node/agent/trace-capability.json",
+      "kind": "service-capability-manifest",
+      "required": true
+    },
+    {
+      "id": "prover-agent-trace-join-fixture",
+      "owner": "prover-node",
+      "path": "prover-node/agent/test/fixtures/hosted-trace-join.json",
+      "kind": "acceptance-fixture",
+      "required": true
+    },
+    {
+      "id": "prover-node-lock",
+      "owner": "prover-node",
+      "path": "prover-node/pnpm-lock.yaml",
+      "kind": "dependency-lock",
+      "required": true
+    },
+    {
+      "id": "contract-abis",
+      "owner": "web3-protocol",
+      "path": "web3-protocol/contracts/out",
+      "kind": "foundry-artifacts",
+      "required": true
+    },
+    {
+      "id": "contract-scenarios",
+      "owner": "web3-protocol",
+      "path": "web3-protocol/contracts/scenarios.json",
+      "kind": "json",
+      "required": true
+    },
+    {
+      "id": "zkvm-trust-root",
+      "owner": "prover-node",
+      "path": "prover-node/zkvm/artifacts.lock.json",
+      "kind": "generated-zkvm-trust-root",
+      "required": false,
+      "phase": "post-two-cuda-build"
+    },
+    {
+      "id": "existing-kurtosis-package",
+      "owner": "kurtosis-testing",
+      "path": "kurtosis-testing/package",
+      "kind": "kurtosis-package",
+      "required": false
+    },
+    {
+      "id": "room-manager-client-abi",
+      "owner": "app-node",
+      "path": "app-node/packages/room-client/src/room-manager-abi.ts",
+      "kind": "typescript-abi",
+      "required": true
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "evidenceContract": {
+    "candidateBound": true,
+    "sourceArtifactHashesRequired": true,
+    "containerRunnerIdentityRequired": true,
+    "failedEvidencePreserved": true,
+    "chatOrManualAttestationAccepted": false
+  },
+  "gates": {
+    "build": {
+      "classification": "container-build",
+      "acceptance": [
+        "Every production owner image builds from the sealed source bundle with pinned bases and dependency locks.",
+        "The evidence records the resulting image ID, byte size, source manifest hash, and build exit code."
+      ]
+    },
+    "unit": {
+      "classification": "container-test",
+      "acceptance": [
+        "The owner unit and focused safety suites pass from the sealed source bytes.",
+        "Named skips are enumerated and none covers a production capability claimed by this candidate."
+      ]
+    },
+    "postgresql": {
+      "classification": "container-live",
+      "acceptance": [
+        "Fresh pinned PostgreSQL exercises schema creation, single-writer fencing, delegated worker leases, idempotency, and restart recovery.",
+        "A stale coordinator or delegated worker cannot mutate canonical state after promotion."
+      ]
+    },
+    "postgresqlMinio": {
+      "classification": "container-live",
+      "acceptance": [
+        "Fresh pinned PostgreSQL and MinIO exercise exact-byte archive, digest verification, durable object lineage, and restart recovery.",
+        "Missing, corrupt, or noncanonical objects fail closed."
+      ]
+    },
+    "apiCatalog": {
+      "classification": "container-live",
+      "acceptance": [
+        "The static owner OpenAPI is deep-equivalent to the live endpoint for the sealed image.",
+        "Every published route has complete authentication, request, response, error, idempotency, and example contracts."
+      ]
+    },
+    "metricsCatalog": {
+      "classification": "container-live",
+      "acceptance": [
+        "The owner publishes a machine-readable metric catalog with exact family name, type, unit, and bounded labels for every production process.",
+        "A live scrape from each process matches that catalog, every alert and dashboard query resolves to it, and forbidden high-cardinality labels are absent."
+      ]
+    },
+    "readOnlyRoot": {
+      "classification": "container-live",
+      "acceptance": [
+        "Hosted services start and pass readiness with a read-only root filesystem and no DATA_DIR application-state authority.",
+        "Canonical mutable state is PostgreSQL or content-addressed object storage under the active fence."
+      ]
+    },
+    "walletAndAllocationAuth": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "Wallet, tenant, room, node, and allocation identities are server-bound and authorization is enforced on every scoped route.",
+        "Cross-tenant, cross-room, replayed, rotated, expired, and under-scoped credentials are denied."
+      ]
+    },
+    "sharedL1Transport": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "All safety-critical reads use independently identified L1 providers with disagreement and staleness fail-closed behavior.",
+        "Production writers use only owner-durable nonce, exact-byte, remote-signer, receipt, finality, and post-finality audit paths."
+      ]
+    },
+    "semanticReconciliation": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "Canonical facts are reconciled against independent RPC evidence and finalized floors rather than caller assertions.",
+        "Reorg, contradiction, and post-finality surprise paths retract or enter RECOVERY_REQUIRED without silently continuing."
+      ]
+    },
+    "correlationLogging": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "Every public, internal, worker, queue, prover, managed-L1, and signer hop emits structured low-cardinality records joined by one sanitized correlation ID.",
+        "The effective correlation ID is returned to the caller; spoofed, malformed, and conflicting incoming IDs cannot split or confuse the trace.",
+        "Secrets, raw transactions, witness bytes, proof bytes, tenant IDs, room IDs, job IDs, and transaction hashes are not metric labels."
+      ]
+    },
+    "nodeLifecycle": {
+      "classification": "container-live",
+      "acceptance": [
+        "Register, quarantine, recover, drain, and retire transitions are exercised through the published owner and capacity-provider APIs.",
+        "Retirement is blocked while active allocations remain and succeeds only after finalized canonical lifecycle evidence."
+      ]
+    },
+    "hostingServiceTopology": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "The owner capability manifest explicitly maps tenant, entitlement, sponsorship execution, finality-oracle, and provider-payout responsibilities to runnable entrypoints or to named coordinator-integrated logical services.",
+        "Coordinator-integrated tenant and entitlement APIs have scoped auth and live route evidence; signer or executor responsibilities use distinct runnable scoped workers and cannot be satisfied by disabled placeholder Deployments or conformance stubs."
+      ]
+    },
+    "managedAggregateL1Operations": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "Aggregate publication uses an owner-published scoped API and service role; callers cannot supply calldata, nonce, sender, canonical outcome, or finality facts.",
+        "Exact bytes, aggregate/member lineage, durable nonce/retry state, canonical receipt, finality, reorg, crash, and post-finality recovery are exercised."
+      ]
+    },
+    "managedSponsorshipL1Operations": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "Sponsorship L1 writes use an owner-published scoped API and signer identity distinct from payout, liveness, settlement, finality, and withdrawal.",
+        "Reservation, successful consumption, failure release, retry transfer, reorg refund or credit, idempotency, and overbooking denial are exercised."
+      ]
+    },
+    "managedWithdrawalL1Operations": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "Withdrawal claims use one fenced owner-published auto-claimer path and a dedicated scoped signer; tenant proof, request, and status APIs remain in the coordinator.",
+        "Canonical root/floor binding, exact leaf/tree/proof/calldata, durable nonce and claim leases, replay denial, external-race evidence, restart, reorg, and post-finality recovery are exercised."
+      ]
+    },
+    "proverAgentTraceJoin": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "The source-bound packaged prover-agent image preserves one correlation ID and the owner-issued tenant, room, job, lease, and attempt context across lease, prover start, heartbeat, completion, and failure records.",
+        "A live owner queue plus real prover run proves the trace join across coordinator, agent, prover, durable heartbeat operation, and final status; missing or conflicting context fails closed."
+      ]
+    },
+    "durableHostedQueueAndHeartbeat": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "Production proving uses only the coordinator PostgreSQL and object-store queue; no standalone or file queue participates.",
+        "The prover agent uses a prove-agent-scoped node token and coordinator-mediated l1-liveness principal, with no raw key, direct signer, or direct L1 RPC authority."
+      ]
+    },
+    "jointHostedIntegration": {
+      "classification": "container-live-adversarial",
+      "acceptance": [
+        "A real app-node engine creates current zkVM BatchInputV5 witnesses, submits to the durable owner queue, uses an authenticated external prover, and publishes RoomManager.submitBatch.",
+        "The content-derived acceptance token binds the exact current source bytes and proves restart-resume plus finalized canonical evidence; fixture preparation and hosted legacy Groth16 are false."
+      ]
+    }
+  }
+}

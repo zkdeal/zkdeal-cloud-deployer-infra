@@ -1,0 +1,201 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "zkdeal hosted API replay fixture",
+    "version": "1"
+  },
+  "paths": {
+    "/hosting/v1/openapi.json": {
+      "get": {
+        "operationId": "getOpenapi",
+        "responses": {
+          "200": {
+            "description": "OpenAPI document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["openapi", "paths"]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/hosting/v1/health": {
+      "get": {
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Healthy",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Health" }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/hosting/v1/protected": {
+      "get": {
+        "operationId": "getProtectedFixture",
+        "responses": {
+          "200": {
+            "description": "Authorized response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Protected" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
+    "/hosting/v1/json-rpc": {
+      "post": {
+        "operationId": "hostedJsonRpc",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/JsonRpcRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON-RPC response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JsonRpcResponse" }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/hosting/v1/admin/reconcile": {
+      "post": {
+        "operationId": "reconcileFixture",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "minLength": 8, "maxLength": 200 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReconcileRequest" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted or replayed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReconcileAccepted" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer" }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ok"],
+        "properties": { "ok": { "const": true } }
+      },
+      "Protected": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tenantId"],
+        "properties": { "tenantId": { "type": "string" } }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      },
+      "JsonRpcRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["jsonrpc", "id", "method", "params"],
+        "properties": {
+          "jsonrpc": { "const": "2.0" },
+          "id": { "type": "string" },
+          "method": { "const": "hosting_capabilities" },
+          "params": { "type": "object", "maxProperties": 0 }
+        }
+      },
+      "JsonRpcResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["jsonrpc", "id", "result"],
+        "properties": {
+          "jsonrpc": { "const": "2.0" },
+          "id": { "type": "string" },
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["service", "schemaVersion"],
+            "properties": {
+              "service": { "const": "fixture" },
+              "schemaVersion": { "const": 1 }
+            }
+          }
+        }
+      },
+      "ReconcileRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["roomId"],
+        "properties": { "roomId": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" } }
+      },
+      "ReconcileAccepted": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operationId", "accepted"],
+        "properties": {
+          "operationId": { "type": "string", "pattern": "^op-[0-9a-f]{12}$" },
+          "accepted": { "const": true }
+        }
+      }
+    }
+  }
+}

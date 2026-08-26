@@ -1,0 +1,67 @@
+services:
+  openbao-permissions:
+    profiles: ["secrets-dev"]
+    image: ${OPENBAO_IMAGE:-openbao/openbao:2.6.1}
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["chmod 0700 /openbao/data /var/log/openbao; chown -R 100:1000 /openbao/data /var/log/openbao"]
+    volumes:
+      - openbao-test-audit:/var/log/openbao
+      - openbao-test-data:/openbao/data
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN"]
+    networks: [internal]
+
+  openbao:
+    command: ["server", "-config=/openbao/config/acceptance.hcl"]
+    volumes: !override
+      - ./openbao/acceptance.hcl:/openbao/config/acceptance.hcl:ro
+      - openbao-test-audit:/var/log/openbao
+      - openbao-test-data:/openbao/data
+    healthcheck:
+      test: ["CMD-SHELL", "bao status -address=http://127.0.0.1:8200 >/dev/null 2>&1; code=$$?; test $$code -eq 0 -o $$code -eq 2"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    depends_on:
+      openbao-permissions: { condition: service_completed_successfully }
+
+  openbao-init:
+    volumes: !override
+      - openbao-test-audit:/var/log/openbao
+
+  web3signer-key-init:
+    profiles: ["signer"]
+    image: ${OPENBAO_IMAGE:-openbao/openbao:2.6.1}
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        umask 077;
+        test "$${#DEV_SIGNER_PRIVATE_KEY}" -eq 66;
+        rm -f /keys/dev.yaml;
+        printf 'type: "file-raw"\nkeyType: "SECP256K1"\nprivateKey: "%s"\n' "$${DEV_SIGNER_PRIVATE_KEY}" >/keys/dev.yaml;
+        chmod 0400 /keys/dev.yaml;
+        chown 65532:65532 /keys/dev.yaml
+    environment:
+      DEV_SIGNER_PRIVATE_KEY: ${DEV_SIGNER_PRIVATE_KEY:?set the ephemeral acceptance key}
+    volumes:
+      - web3signer-test-keys:/keys
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN"]
+    networks: [internal]
+
+  web3signer:
+    volumes: !override
+      - web3signer-test-keys:/var/lib/web3signer/keys:ro
+    depends_on:
+      web3signer-key-init: { condition: service_completed_successfully }
+
+volumes:
+  openbao-test-audit: {}
+  openbao-test-data: {}
+  web3signer-test-keys: {}

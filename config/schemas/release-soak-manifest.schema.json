@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zkdeal.example/schemas/release-soak-manifest.schema.json",
+  "title": "ZKDeal owner-driven release soak manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "durationSeconds", "umbrellaSourceManifestSha256", "sourceBundleArchiveSha256", "sourceClosureSha256", "physicalScenario", "images", "trustRoots", "chainSeed", "expected", "budgets", "scheduledFaults"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "zkdeal-release-soak"},
+    "durationSeconds": {"type": "integer", "minimum": 43200},
+    "umbrellaSourceManifestSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sourceBundleArchiveSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sourceClosureSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "physicalScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "settlementScenarioSha256", "deploymentAddressesSha256",
+        "ownerDurableCapabilitiesSha256", "ownerAcceptanceToken",
+        "hostedBatchInput", "fixturePrepare", "realCudaProof", "aggregateMembers",
+        "transactionBlobs", "partialSuccessApplied", "partialSuccessFailed",
+        "successOnlyCharging", "withdrawalClaim", "sponsorship", "preFinalityReorg",
+        "freshDeployment", "restartResume", "ownerDurablePublishing",
+        "castEncodingOnly", "directBroadcastAllowed"
+      ],
+      "properties": {
+        "settlementScenarioSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "deploymentAddressesSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "ownerDurableCapabilitiesSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "ownerAcceptanceToken": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "hostedBatchInput": {"const": "BatchInputV5"},
+        "fixturePrepare": {"const": false},
+        "realCudaProof": {"const": true},
+        "aggregateMembers": {"const": 8},
+        "transactionBlobs": {"const": 6},
+        "partialSuccessApplied": {"const": 7},
+        "partialSuccessFailed": {"const": 1},
+        "successOnlyCharging": {"const": true},
+        "withdrawalClaim": {"const": true},
+        "sponsorship": {"const": true},
+        "preFinalityReorg": {"const": true},
+        "freshDeployment": {"const": true},
+        "restartResume": {"const": true},
+        "ownerDurablePublishing": {"const": true},
+        "castEncodingOnly": {"const": true},
+        "directBroadcastAllowed": {"const": false}
+      }
+    },
+    "images": {
+      "type": "object",
+      "required": ["coordinator", "indexer", "reconciler", "headless", "prover", "ownerAcceptanceRunner"],
+      "additionalProperties": {"type": "string", "pattern": "^[^\\s@]+@sha256:[0-9a-f]{64}$"}
+    },
+    "trustRoots": {
+      "type": "object",
+      "required": ["contractsAbiSha256", "circuitManifestSha256", "zkvmArtifactsSha256", "generatedTrustRootClosureSha256"],
+      "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+    },
+    "chainSeed": {
+      "type": "object",
+      "required": ["chainId", "genesisHash", "seedSha256", "rpcEndpoints"],
+      "properties": {
+        "chainId": {"type": "integer", "minimum": 1},
+        "genesisHash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+        "seedSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "rpcEndpoints": {"type": "array", "minItems": 2, "items": {"type": "string", "format": "uri"}}
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": ["usageUnits", "chargesWei"],
+      "properties": {"usageUnits": {"type": "integer", "minimum": 0}, "chargesWei": {"type": "string", "pattern": "^[0-9]+$"}},
+      "additionalProperties": false
+    },
+    "budgets": {
+      "type": "object",
+      "required": ["maxUnresolvedSafetyEvents", "maxUnresolvedClaims", "maxDuplicateNonces", "maxDuplicateCharges", "maxFairnessWaitMs", "maxDeadlineMisses"],
+      "properties": {
+        "maxUnresolvedSafetyEvents": {"const": 0}, "maxUnresolvedClaims": {"const": 0},
+        "maxDuplicateNonces": {"const": 0}, "maxDuplicateCharges": {"const": 0},
+        "maxFairnessWaitMs": {"type": "integer", "minimum": 1}, "maxDeadlineMisses": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "scheduledFaults": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object", "required": ["kind", "atSecond"],
+        "properties": {"kind": {"type": "string"}, "atSecond": {"type": "integer", "minimum": 0}},
+        "additionalProperties": false
+      }
+    }
+  }
+}

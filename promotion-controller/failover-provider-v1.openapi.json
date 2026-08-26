@@ -1,0 +1,242 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ZKDeal failover provider boundary",
+    "version": "1.0.0",
+    "description": "Provider-neutral fencing, PostgreSQL promotion, stable endpoint, route and post-fence signer boundary consumed by the deployment-owned promotion controller. This interface is infrastructure orchestration, not an owner service implementation."
+  },
+  "servers": [{ "url": "https://failover-provider.example" }],
+  "security": [{ "providerBearer": [] }],
+  "paths": {
+    "/v1/failovers": {
+      "post": {
+        "operationId": "prepareFailover",
+        "summary": "Fence the old writer and prepare the standby database",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/ApprovalToken" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PrepareRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Durably prepared or exact idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PrepareResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        },
+        "x-zkdeal-idempotency": "The key binds the complete request and durable operation ID. A changed request with the same key returns 409."
+      }
+    },
+    "/v1/failovers/{operationId}/commit": {
+      "post": {
+        "operationId": "commitFailover",
+        "summary": "Commit the application writer route and post-fence signer boundary",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/SafeId" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/ApprovalToken" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ownerResponseSha256"],
+                "properties": {
+                  "ownerResponseSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Route/signer commit completed or exact replay",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CommitResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        },
+        "x-zkdeal-ordering": "The provider must reject commit until the owner promotion response is hash-bound to the prepared operation. Signer authority may activate only in this commit."
+      }
+    },
+    "/v1/failovers/{operationId}": {
+      "get": {
+        "operationId": "getFailoverStatus",
+        "summary": "Read the durable phase and measured promotion duration of one failover",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/SafeId" }
+          },
+          { "$ref": "#/components/parameters/ApprovalToken" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable operation status with the measured RTO once committed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StatusResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "providerBearer": { "type": "http", "scheme": "bearer" }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/SafeId" }
+      },
+      "ApprovalToken": {
+        "name": "X-Zkdeal-Failover-Approval",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "minLength": 16, "maxLength": 4096 }
+      }
+    },
+    "schemas": {
+      "SafeId": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 200,
+        "pattern": "^[a-z0-9][a-z0-9._:-]{7,199}$"
+      },
+      "Lsn": { "type": "string", "pattern": "^[0-9A-Fa-f]+/[0-9A-Fa-f]+$" },
+      "PrepareRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidateId", "activeCoordinatorId", "standbyCoordinatorId", "failedWitnessCount"],
+        "properties": {
+          "candidateId": { "$ref": "#/components/schemas/SafeId" },
+          "activeCoordinatorId": { "$ref": "#/components/schemas/SafeId" },
+          "standbyCoordinatorId": { "$ref": "#/components/schemas/SafeId" },
+          "failedWitnessCount": { "type": "integer", "minimum": 2, "maximum": 32 }
+        }
+      },
+      "PrepareResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId", "status", "activeFenced", "oldWriterTerminated",
+          "targetCapturedByProvider", "databasePromoted", "standbyReplayAtOrAfterTarget",
+          "indexerHeadMatchesL1", "stableDatabaseEndpointRouted",
+          "standbySignerAuthorityActive", "primaryTargetSource", "primaryTargetLsn",
+          "standbyReplayLsn", "checkpointAgeSeconds"
+        ],
+        "properties": {
+          "operationId": { "$ref": "#/components/schemas/SafeId" },
+          "status": { "const": "READY_FOR_APPLICATION_PROMOTION" },
+          "activeFenced": { "const": true },
+          "oldWriterTerminated": { "const": true },
+          "targetCapturedByProvider": { "const": true },
+          "databasePromoted": { "const": true },
+          "standbyReplayAtOrAfterTarget": { "const": true },
+          "indexerHeadMatchesL1": { "const": true },
+          "stableDatabaseEndpointRouted": { "const": true },
+          "standbySignerAuthorityActive": { "const": false },
+          "primaryTargetSource": { "const": "durable-fenced-wal-checkpoint" },
+          "primaryTargetLsn": { "$ref": "#/components/schemas/Lsn" },
+          "standbyReplayLsn": { "$ref": "#/components/schemas/Lsn" },
+          "checkpointAgeSeconds": { "type": "integer", "minimum": 0, "maximum": 300 }
+        }
+      },
+      "CommitResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId", "writerRouteCommitted", "writerCoordinatorId",
+          "oldWriterRouteRemoved", "stableDatabaseEndpointRouted",
+          "signerAuthorityActivatedAfterFence", "rtoSeconds",
+          "targetCapturedAtUnixMs", "committedAtUnixMs"
+        ],
+        "properties": {
+          "operationId": { "$ref": "#/components/schemas/SafeId" },
+          "writerRouteCommitted": { "const": true },
+          "writerCoordinatorId": { "$ref": "#/components/schemas/SafeId" },
+          "oldWriterRouteRemoved": { "const": true },
+          "stableDatabaseEndpointRouted": { "const": true },
+          "signerAuthorityActivatedAfterFence": { "const": true },
+          "rtoSeconds": { "type": "integer", "minimum": 0 },
+          "targetCapturedAtUnixMs": { "type": "integer", "minimum": 0 },
+          "committedAtUnixMs": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "StatusResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId", "phase", "createdAtUnixMs",
+          "targetCapturedAtUnixMs", "committedAtUnixMs", "rtoSeconds"
+        ],
+        "properties": {
+          "operationId": { "$ref": "#/components/schemas/SafeId" },
+          "phase": { "enum": ["PREPARING", "PREPARED", "COMMITTED"] },
+          "createdAtUnixMs": { "type": "integer", "minimum": 0 },
+          "targetCapturedAtUnixMs": { "type": ["integer", "null"], "minimum": 0 },
+          "committedAtUnixMs": { "type": ["integer", "null"], "minimum": 0 },
+          "rtoSeconds": { "type": ["integer", "null"], "minimum": 0 }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "message": { "type": "string", "minLength": 1, "maxLength": 1024 }
+        }
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Fail-closed provider error",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+        }
+      }
+    }
+  }
+}

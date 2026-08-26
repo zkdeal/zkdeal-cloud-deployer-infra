@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": null,
+  "policy": {
+    "productionRequiresDigest": true,
+    "acceptedAlgorithm": "sha256"
+  },
+  "images": {
+    "coordinator": {
+      "repository": "zkdeal-coordinator",
+      "digest": null,
+      "status": "owner-build-required",
+      "ownerArtifact": "coordinator-dockerfile",
+      "requiredInProduction": true
+    },
+    "queue": {
+      "repository": "zkdeal-coordinator",
+      "digest": null,
+      "status": "standalone-filesystem-queue-is-local-development-only",
+      "ownerArtifact": "coordinator-dockerfile",
+      "requiredInProduction": false
+    },
+    "indexer": {
+      "repository": "zkdeal-coordinator",
+      "digest": null,
+      "status": "same pruned owner image; delegated worker promotion/stale-fence acceptance passed",
+      "ownerArtifact": "hosted-service-capabilities",
+      "requiredInProduction": true
+    },
+    "reconciler": {
+      "repository": "zkdeal-coordinator",
+      "digest": null,
+      "status": "same pruned owner image; delegated worker promotion/stale-fence acceptance passed",
+      "ownerArtifact": "hosted-service-capabilities",
+      "requiredInProduction": true
+    },
+    "publisher": {
+      "repository": "zkdeal-coordinator",
+      "digest": null,
+      "status": "same pruned owner image; fenced publisher crash/replay/finality acceptance passed",
+      "ownerArtifact": "hosted-service-capabilities",
+      "requiredInProduction": true
+    },
+    "autoClaimer": {
+      "repository": "zkdeal-coordinator",
+      "digest": null,
+      "status": "same pruned owner image; live PG exact-byte restart, nonce, external-race and post-finality gates passed",
+      "ownerArtifact": "hosted-service-capabilities",
+      "requiredInProduction": true
+    },
+    "capacityController": {
+      "repository": "zkdeal-coordinator",
+      "digest": null,
+      "status": "same pruned owner image; live PostgreSQL, MinIO, provider protocol and queue acceptance passed",
+      "ownerArtifact": "hosted-service-capabilities",
+      "requiredInProduction": true
+    },
+    "headlessRoomNode": {
+      "repository": "zkdeal-headless-room-node",
+      "digest": null,
+      "status": "separate pruned owner image; local Docker smoke passed; release digest and deployment acceptance required",
+      "ownerArtifact": "headless-room-node-capabilities",
+      "requiredInProduction": true
+    },
+    "agent": {
+      "repository": "zkdeal-prover-agent",
+      "digest": null,
+      "status": "deployment-packaged-owner-agent-source-build-required",
+      "ownerArtifact": "prover-agent-liveness-capabilities",
+      "requiredInProduction": true
+    },
+    "prover": {
+      "repository": "zkdeal-risc0-cuda-runtime",
+      "digest": null,
+      "status": "physical-gpu-release-required",
+      "ownerArtifact": "zkvm-trust-root",
+      "requiredInProduction": true
+    },
+    "docs": {
+      "repository": "zkdeal-operator-docs",
+      "digest": null,
+      "status": "local-build",
+      "requiredInProduction": true
+    },
+    "promotionController": {
+      "repository": "zkdeal-promotion-controller",
+      "digest": null,
+      "status": "deployment-owned provider-neutral controller; fixture-live gate only; real failover provider acceptance required",
+      "requiredInProduction": true
+    },
+    "failoverProvider": {
+      "repository": "zkdeal-failover-provider",
+      "digest": null,
+      "status": "deployment-owned Docker and Kubernetes adapters; release digest and target-platform live acceptance required",
+      "requiredInProduction": true
+    },
+    "acceptanceRunner": {
+      "repository": "zkdeal-owner-acceptance-runner",
+      "digest": null,
+      "status": "deployment-owned source-bound real API assertion runner; candidate plan/token/credential bindings and live candidate topology required",
+      "requiredInProduction": true
+    },
+    "failoverRunner": {
+      "repository": "zkdeal-failover-runner",
+      "digest": null,
+      "status": "deployment-owned promotion-controller plus independent split-brain verifier; real provider/owner/platform evidence required",
+      "requiredInProduction": true
+    },
+    "soakRunner": {
+      "repository": "zkdeal-soak-runner",
+      "digest": null,
+      "status": "deployment-owned restart/resume and closure verifier; real owner lifecycle driver and 12-hour physical evidence required",
+      "requiredInProduction": true
+    },
+    "faultController": {
+      "repository": "zkdeal-fault-control-adapter",
+      "digest": null,
+      "status": "required distinct scoped fault/load authority; source, capability, candidate topology and live platform evidence not yet published",
+      "requiredInProduction": true
+    },
+    "backupRestoreController": {
+      "repository": "zkdeal-backup-restore-control-adapter",
+      "digest": null,
+      "status": "required distinct scoped PostgreSQL/object backup-restore authority; source, capability, candidate topology and live restore evidence not yet published",
+      "requiredInProduction": true
+    },
+    "frontDoor": {
+      "repository": "nginx",
+      "digest": "sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+      "status": "registry manifest verified for 1.27-alpine; Nginx is the active edge implementation",
+      "requiredInProduction": true
+    },
+    "prometheus": {
+      "repository": "prom/prometheus",
+      "digest": "sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
+      "status": "registry manifest verified for v3.5.0",
+      "requiredInProduction": true
+    },
+    "grafana": {
+      "repository": "grafana/grafana",
+      "digest": "sha256:6ac590e7cabc2fbe8d7b8fc1ce9c9f0582177b334e0df9c927ebd9670469440f",
+      "status": "registry manifest verified for 12.1.0",
+      "requiredInProduction": true
+    },
+    "postgres": {
+      "repository": "postgres",
+      "digest": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+      "status": "registry manifest verified for 17.6-alpine; embedded development and psql-based promotion replay gate",
+      "requiredInProduction": true
+    },
+    "minio": {
+      "repository": "minio/minio",
+      "digest": "sha256:a1ea29fa28355559ef137d71fc570e508a214ec84ff8083e39bc5428980b015e",
+      "status": "registry manifest verified for RELEASE.2025-04-22T22-12-26Z; embedded development only",
+      "requiredInProduction": false
+    },
+    "minioClient": {
+      "repository": "minio/mc",
+      "digest": "sha256:aead63c77f9db9107f1696fb08ecb0faeda23729cde94b0f663edf4fe09728e3",
+      "status": "registry manifest verified for RELEASE.2025-04-16T18-13-26Z",
+      "requiredInProduction": false
+    },
+    "openbao": {
+      "repository": "openbao/openbao",
+      "digest": "sha256:5b2486ab0fb90bbc788cc345b0a08616dfb375873ee8be5df3a2fd4d378a67e0",
+      "status": "registry manifest verified for 2.6.1; production still requires initialized HA storage",
+      "requiredInProduction": false
+    },
+    "web3signer": {
+      "repository": "consensys/web3signer",
+      "digest": "sha256:48d05fa329615527b1c4f94b0a63b376540b143cd0d93fa3f56f584d81ddc9ce",
+      "status": "registry manifest verified for 26.4.2-distroless; operator key configuration required",
+      "requiredInProduction": true
+    },
+    "alertmanager": {
+      "repository": "prom/alertmanager",
+      "digest": "sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
+      "status": "registry manifest verified for v0.28.1",
+      "requiredInProduction": true
+    },
+    "loki": {
+      "repository": "grafana/loki",
+      "digest": "sha256:3165cecce301ce5b9b6e3530284b080934a05cd5cafac3d3d82edcb887b45ecd",
+      "status": "registry manifest verified for 3.5.3; production may use external equivalent",
+      "requiredInProduction": false
+    },
+    "promtail": {
+      "repository": "grafana/promtail",
+      "digest": "sha256:698c3357886c886bb9a862da36062e130c20bf359d956148e67ee36141ef6f17",
+      "status": "registry manifest verified for 3.5.3; optional local Docker log collector",
+      "requiredInProduction": false
+    },
+    "curl": {
+      "repository": "curlimages/curl",
+      "digest": "sha256:4026b29997dc7c823b51c164b71e2b51e0fd95cce4601f78202c513d97da2922",
+      "status": "registry manifest verified for 8.15.0",
+      "requiredInProduction": false
+    },
+    "python": {
+      "repository": "python",
+      "digest": "sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d",
+      "status": "registry manifest verified for 3.13-alpine; conformance and local webhook only",
+      "requiredInProduction": false
+    },
+    "nginx": {
+      "repository": "nginx",
+      "digest": "sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+      "status": "registry manifest verified for 1.27-alpine; docs image base",
+      "requiredInProduction": false
+    },
+    "openssl": {
+      "repository": "alpine/openssl",
+      "digest": "sha256:42c7389ef077aed0eb4e96d0abbd094083d701bbaff1313073b061c0c9cd8278",
+      "status": "registry manifest verified for 3.5.4; backup envelope tool stage",
+      "requiredInProduction": false
+    },
+    "helm": {
+      "repository": "alpine/helm",
+      "digest": "sha256:e7ecbf4a200dea73d64bfb8cb0936829164945f2b4d02a0274093073ee8d264f",
+      "status": "containerized chart renderer and installer",
+      "requiredInProduction": false
+    },
+    "kindNode": {
+      "repository": "kindest/node",
+      "digest": "sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f",
+      "status": "official kind v0.27.0 Kubernetes v1.32.2 node image",
+      "requiredInProduction": false
+    },
+    "localOciRegistry": {
+      "repository": "registry",
+      "digest": "sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373",
+      "status": "official registry 2.8.3 multi-platform manifest; pinned on-node candidate registry",
+      "requiredInProduction": false
+    }
+  }
+}

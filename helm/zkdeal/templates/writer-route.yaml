@@ -1,0 +1,17 @@
+{{- if and .Values.components.coordinatorActive.enabled .Values.components.coordinatorStandby.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-coordinator-writer
+  labels:
+    {{- include "zkdeal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: coordinator-writer-route
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    zkdeal.io/failover-target: active
+  ports:
+    - name: http
+      port: {{ .Values.components.coordinatorActive.port }}
+      targetPort: http
+{{- end }}

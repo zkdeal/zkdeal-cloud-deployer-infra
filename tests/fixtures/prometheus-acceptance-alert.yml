@@ -1,0 +1,10 @@
+groups:
+  - name: zkdeal.acceptance
+    rules:
+      - alert: ZkdealAcceptanceSignal
+        expr: zkdeal_acceptance_signal > 0
+        for: 1s
+        labels: { severity: warning, service: acceptance, unit: boolean }
+        annotations:
+          summary: Synthetic live alert path
+          runbook_url: /guides/monitoring-runbooks.md#acceptance-only-signal

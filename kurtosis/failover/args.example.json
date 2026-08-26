@@ -1,0 +1,18 @@
+{
+  "images": {
+    "failover_runner": "registry.invalid/zkdeal-failover-runner@sha256:REPLACE_WITH_64_HEX"
+  },
+  "candidate_id": "REPLACE_WITH_CANDIDATE_ID",
+  "hosted_integration_token": "sha256:REPLACE_WITH_64_HEX",
+  "topology_verification_file": "REPLACE_WITH_CANDIDATE_TOPOLOGY_VERIFICATION_JSON_PATH",
+  "topology_verification_sha256": "REPLACE_WITH_64_HEX",
+  "plan_file": "REPLACE_WITH_ACCEPTANCE_PLAN_JSON_PATH",
+  "plan_sha256": "REPLACE_WITH_64_HEX",
+  "auth_files": {
+    "failover_control": "REPLACE_WITH_EPHEMERAL_FAILOVER_CONTROL_TOKEN_FILE",
+    "failover_approval": "REPLACE_WITH_EPHEMERAL_FAILOVER_APPROVAL_TOKEN_FILE"
+  },
+  "promotion_principal_file": "REPLACE_WITH_EPHEMERAL_PROMOTION_PRINCIPAL_TOKEN_FILE",
+  "promotion_principal_sha256": "REPLACE_WITH_64_HEX",
+  "failover_command": "/opt/zkdeal-failover --terminate-active --persist-primary-target-lsn --assert-standby-replay --promote --assert-stale-writer-denied --assert-rto-seconds 300"
+}

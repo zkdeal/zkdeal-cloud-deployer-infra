@@ -1,0 +1,30 @@
+profile: local
+
+chain:
+  rpcUrls: "http://rpc-a.invalid:8545,http://rpc-b.invalid:8545"
+  rpcProviderIds: "kind-independent-a,kind-independent-b"
+  beaconSidecarUrls: "http://beacon-a.invalid:5052,http://beacon-b.invalid:5052"
+
+storage:
+  backend: external-transactional
+  fencing: owner-service-transactional
+
+components:
+  coordinatorActive:
+    image: { repository: zkdeal-coordinator, tag: kind, digest: "", pullPolicy: Never }
+    readinessPath: /hosting/v1/health
+    signerRole: ""
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+  queue: { enabled: false }
+  docs:
+    image: { repository: zkdeal-operator-docs, tag: kind, digest: "", pullPolicy: Never }
+
+autoscaling:
+  enabled: true
+  components:
+    docs: { minReplicas: 1, maxReplicas: 2, metricName: zkdeal_docs_requests_per_second, targetAverageValue: "20" }
+
+operations:
+  backup:
+    enabled: true
+    image: { repository: zkdeal-backup-tools, tag: kind, digest: "", pullPolicy: Never }

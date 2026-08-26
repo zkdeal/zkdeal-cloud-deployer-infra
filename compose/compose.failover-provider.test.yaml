@@ -1,0 +1,103 @@
+name: zkdeal-failover-provider-acceptance
+
+x-platform-fixture: &platform-fixture
+  image: ${FAILOVER_PLATFORM_FIXTURE_IMAGE:-zkdeal-failover-platform-fixture:acceptance}
+  build:
+    context: ..
+    dockerfile: tests/fixtures/FailoverPlatform.Dockerfile
+  read_only: true
+  tmpfs: ["/tmp:size=8m,mode=1777"]
+  cap_drop: ["ALL"]
+  security_opt: ["no-new-privileges:true"]
+  networks: [database]
+
+services:
+  coordinator-active:
+    <<: *platform-fixture
+    environment:
+      FIXTURE_ROLE: active
+      FIXTURE_COORDINATOR_ID: active-region-a
+      FIXTURE_HEALTHY: "true"
+    networks:
+      database: { aliases: [coordinator-writer] }
+
+  coordinator-standby:
+    <<: *platform-fixture
+    environment:
+      FIXTURE_ROLE: standby
+      FIXTURE_COORDINATOR_ID: standby-region-b
+
+  witness-a:
+    <<: *platform-fixture
+    environment:
+      FIXTURE_ROLE: witness
+      FIXTURE_COORDINATOR_ID: active-region-a
+      FIXTURE_HEALTHY: "true"
+
+  witness-b:
+    <<: *platform-fixture
+    environment:
+      FIXTURE_ROLE: witness
+      FIXTURE_COORDINATOR_ID: active-region-a
+      FIXTURE_HEALTHY: "false"
+
+  indexer-freshness:
+    <<: *platform-fixture
+    environment: { FIXTURE_ROLE: indexer }
+
+  signer-authority:
+    <<: *platform-fixture
+    profiles: ["signer"]
+    environment: { FIXTURE_ROLE: signer }
+
+  failover-provider-docker:
+    image: ${FAILOVER_PROVIDER_IMAGE:-zkdeal-failover-provider:acceptance}
+    build:
+      context: ..
+      dockerfile: failover-provider/Dockerfile
+    profiles: ["provider"]
+    environment:
+      FAILOVER_PLATFORM: docker
+      FAILOVER_PROVIDER_ALLOW_INSECURE_HTTP: acceptance-only
+      ACTIVE_HEALTH_URLS: http://witness-a:8080/health,http://witness-b:8080/health
+      STANDBY_HEALTH_URL: http://coordinator-standby:8080/health
+      INDEXER_FRESHNESS_URL: http://indexer-freshness:8080/freshness
+      SIGNER_AUTHORITY_HEALTH_URLS: http://signer-authority:8080/health
+      ACTIVE_COORDINATOR_ID: active-region-a
+      STANDBY_COORDINATOR_ID: standby-region-b
+      # Known fixture credentials; production mounts file-backed secrets.
+      FAILOVER_PROVIDER_TOKEN: provider-acceptance-token-0001
+      FAILOVER_APPROVAL_TOKEN: approval-acceptance-token-0001
+      FAILOVER_PROVIDER_STATE_PATH: /var/lib/zkdeal-failover-provider/state.json
+      FAILOVER_PROVIDER_LISTEN_PORT: "8443"
+      REQUEST_TIMEOUT_SECONDS: "2"
+      PLATFORM_TIMEOUT_SECONDS: "90"
+      DOCKER_COMPOSE_PROJECT: zkdeal-failover-provider-acceptance
+      DOCKER_FAILOVER_NETWORK: zkdeal-failover-provider-acceptance_database
+      DOCKER_ACTIVE_SERVICE: coordinator-active
+      DOCKER_STANDBY_SERVICE: coordinator-standby
+      DOCKER_PRIMARY_DB_SERVICE: pg-primary
+      DOCKER_STANDBY_DB_SERVICE: pg-standby
+      DOCKER_SIGNER_SERVICE: signer-authority
+      DOCKER_DATABASE_ALIAS: postgres-writer
+      DOCKER_APPLICATION_ALIAS: coordinator-writer
+      FAILOVER_PGUSER: zkdeal
+      FAILOVER_PGDATABASE: zkdeal
+      FAILOVER_PGDATA: /var/lib/postgresql/data
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - failover-provider-state:/var/lib/zkdeal-failover-provider
+    group_add: ["0"]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    networks: [database]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8443/ready',timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  failover-provider-state: {}

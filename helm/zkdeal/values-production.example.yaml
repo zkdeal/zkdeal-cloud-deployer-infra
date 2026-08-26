@@ -1,0 +1,241 @@
+profile: production
+# Stable resource names are part of the failover-provider's scoped RBAC contract.
+fullnameOverride: zkdeal
+ownerCapabilities:
+  manifest: web2-api/server/capabilities/hosted-service.json
+  protocolJournalSchema: 6
+  databaseSchema: 28
+  filesystemApplicationStateAuthority: false
+  dataDirRequired: false
+  readOnlyRootSupported: true
+  legacyObserverRoutes: retired-410
+  observationAuthority: postgresql-canonical-projection
+  delegatedWorkerMutations: true
+  workerDeploymentStatus: owner-live-promotion-blob-publisher-and-withdrawal-gates-passed
+  blobArchivePrimitive: true
+  publisherBroadcastEntrypoint: true
+  publisherArchiveBeforeBroadcast: true
+  publisherDurableNonceJournal: true
+  publisherPostFinalitySurprise: RECOVERY_REQUIRED
+  autoClaimerEntrypoint: true
+  autoClaimerWorkerComponent: withdrawal
+  withdrawalAcceptanceStatus: owner-live-pg-exact-byte-restart-and-external-race-gates-passed
+  capacityEntrypoint: true
+  capacityWorkerComponent: capacity
+  capacityProviderProtocol: zkdeal-capacity-provider-v1
+  capacityAcceptanceStatus: owner-live-pg-minio-provider-and-queue-gates-passed
+  # Pinned to the owner room-node hosted contract
+  # (app-node/packages/room-node/capabilities/room-node.json modes.hosted and
+  # hosted-service.json managedL1Operations.roomBatch).
+  hostedAdmissionLease: true
+  hostedRoomBatchEnabled: true
+  hostedEngineToBatchInputV5: true
+  hostedDurablePostgresQueue: true
+  hostedExternalProver: true
+  hostedRestartResume: true
+  hostedFixturePrepare: false
+  hostedLegacyGroth16: false
+  # Intentionally invalid until the replacement source-bound token is sealed:
+  # production rendering fails closed unless this is the exact sha256 token of
+  # the owner-published hostedIntegration joint-acceptance manifest.
+  hostedIntegrationAcceptanceToken: "sha256:357c1ebdd407e84e5a239111b049ee25c1f33f5617d9f1fc53fd6c3d285418f0"
+global:
+  existingSecret: zkdeal-production-secrets
+chain:
+  id: "1"
+  rpcUrls: "https://rpc-a.example,https://rpc-b.example"
+  rpcProviderIds: "production-independent-a,production-independent-b"
+  roomManager: "0x1111111111111111111111111111111111111111"
+  roomPool: "0x2222222222222222222222222222222222222222"
+  accessToken: "0x3333333333333333333333333333333333333333"
+  beaconSidecarUrls: "https://beacon-a.example,https://beacon-b.example"
+storage:
+  backend: external-transactional
+  fencing: owner-service-transactional
+availability:
+  mode: warm-standby
+  rtoMinutes: 4
+  activeCoordinatorId: zkdeal-production-primary
+  standbyCoordinatorId: zkdeal-production-standby
+externalServices:
+  openbaoAddress: https://openbao.service.example
+  web3SignerAddress: ""
+  signerRoles:
+    liveness: { address: "https://web3signer-liveness.service.example", signerAddress: "0x1111111111111111111111111111111111111111", cidrs: ["192.0.2.31/32"] }
+    operationsSettlement: { address: "https://web3signer-operations.service.example", cidrs: ["192.0.2.32/32"] }
+    payout: { address: "https://web3signer-payout.service.example", cidrs: ["192.0.2.33/32"] }
+    finalityOracle: { address: "https://web3signer-finality.service.example", cidrs: ["192.0.2.34/32"] }
+    sponsorRelayer: { address: "https://web3signer-sponsor.service.example", cidrs: ["192.0.2.35/32"] }
+    withdrawalRelayer: { address: "https://web3signer-withdrawal.service.example", signerAddress: "0x5555555555555555555555555555555555555555", cidrs: ["192.0.2.36/32"] }
+    blobPublisher: { address: "https://web3signer-blob.service.example", signerAddress: "0x4444444444444444444444444444444444444444", cidrs: ["192.0.2.37/32"] }
+components:
+  coordinatorActive:
+    image: { repository: registry.example/zkdeal-coordinator, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+    env: { OPENBAO_ADDR: "https://openbao.service.example" }
+    secretEnv: { INDEXER_TOKEN: indexer-token, ADMISSION_TOKEN: admission-token, NODE_LIVENESS_SIGNER_AUTH_TOKEN: node-liveness-signer-auth-token }
+  coordinatorStandby:
+    enabled: true
+    image: { repository: registry.example/zkdeal-coordinator, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    secretEnv: {}
+  queue:
+    enabled: false
+    image: { repository: registry.example/zkdeal-coordinator, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+  indexer:
+    enabled: true
+    image: { repository: registry.example/zkdeal-coordinator, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    secretEnv: {}
+  reconciler:
+    enabled: true
+    image: { repository: registry.example/zkdeal-coordinator, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    secretEnv: {}
+  publisher:
+    enabled: true
+    image: { repository: registry.example/zkdeal-coordinator, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    command: ["node", "dist/hosted-publisher-worker.js"]
+    secretEnv: { L1_SIGNER_AUTH_TOKEN: blob-publisher-auth-token }
+  headlessNode:
+    enabled: true
+    image: { repository: registry.example/zkdeal-headless-room-node, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    command: ["node", "dist/cli.js", "run"]
+    roomNode:
+      configMapName: zkdeal-room-node-config
+      secretName: zkdeal-room-node-file-secrets
+      artifactClaimName: zkdeal-room-node-artifacts
+  prover:
+    enabled: false
+    image: { repository: registry.example/zkdeal-risc0-cuda-runtime, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+  proverAgent:
+    enabled: false
+    image: { repository: registry.example/zkdeal-prover-agent, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    command: ["node", "/app/agent/agent.js"]
+    workingDir: /app
+    signerRole: ""
+    injectChain: false
+    allowExternalEgress: false
+    env:
+      QUEUE_URL: "http://zkdeal-coordinator-active:3000"
+      NODE_LIVENESS_COORDINATOR_URL: "http://zkdeal-coordinator-active:3000"
+      NODE_ID: REPLACE_WITH_BOUND_PROVIDER_NODE_ID
+      NODE_LIVENESS_ACCOUNT: "0x1111111111111111111111111111111111111111"
+      PROVER_URL: "http://zkdeal-prover:8080"
+      ZKDEAL_AGENT_GPU: "1"
+    secretEnv:
+      ZKDEAL_QUEUE_NODE_TOKEN: queue-node-token
+      ZKDEAL_PROVER_TOKEN: prover-token
+      NODE_LIVENESS_COORDINATOR_AUTH_TOKEN: node-liveness-coordinator-auth-token
+  # Tenant, entitlement, and sponsorship-registration APIs are served as
+  # coordinator routes; finalized-checkpoint and sponsor L1 mutations are
+  # owner managed L1 operations on the coordinator plane with scoped signer
+  # roles. There are deliberately no tenant-api/sponsorship/finality-oracle/
+  # provider-payout service slots (see helm/zkdeal/values.yaml components).
+  capacityController:
+    enabled: true
+    image: { repository: registry.example/zkdeal-coordinator, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    command: ["node", "dist/hosted-capacity-worker.js", "run"]
+    env: { CAPACITY_PROVIDER_URL: "https://capacity-provider.service.example/v1" }
+    secretEnv: { CAPACITY_PROVIDER_AUTH_TOKEN: capacity-provider-auth-token }
+  autoClaimer:
+    enabled: true
+    image: { repository: registry.example/zkdeal-coordinator, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    command: ["node", "dist/hosted-withdrawal-worker.js", "run"]
+    secretEnv: { WITHDRAWAL_SIGNER_AUTH_TOKEN: withdrawal-signer-auth-token }
+  docs:
+    image: { repository: registry.example/zkdeal-operator-docs, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+ingress:
+  enabled: true
+  className: nginx
+  host: zkdeal.example
+  tls: { enabled: true, secretName: zkdeal-tls }
+monitoring:
+  serviceMonitor: { enabled: true, interval: 15s }
+  prometheusRule: { enabled: true }
+autoscaling:
+  enabled: true
+networkPolicy:
+  externalEgressCidrs: ["192.0.2.10/32", "198.51.100.20/32"]
+  externalEgressPorts: [443]
+  operationalFlows:
+    backup: { cidrs: ["192.0.2.40/32", "192.0.2.41/32", "192.0.2.42/32"], ports: [443, 5432] }
+    restore: { cidrs: ["192.0.2.41/32", "192.0.2.42/32", "192.0.2.43/32"], ports: [443, 5432] }
+    migration: { cidrs: ["192.0.2.40/32"], ports: [5432] }
+    promotion: { cidrs: ["192.0.2.40/32"], ports: [5432] }
+    promotionController: { cidrs: ["192.0.2.44/32", "192.0.2.45/32", "192.0.2.46/32"], ports: [443] }
+    failoverProvider: { cidrs: ["192.0.2.44/32", "192.0.2.45/32", "192.0.2.47/32"], ports: [443] }
+    # Exact post-fence signer-role destinations; liveness remains outside this authority.
+    signerAuthority: { cidrs: ["192.0.2.32/32", "192.0.2.33/32", "192.0.2.34/32", "192.0.2.35/32", "192.0.2.36/32", "192.0.2.37/32"], ports: [443] }
+operations:
+  backup:
+    enabled: true
+    image: { repository: registry.example/zkdeal-backup-tools, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+    sourceBucket: zkdeal-production
+    sourcePrefix: live
+    backupBucket: zkdeal-production-backups
+    backupPrefix: hosted
+    targetObjectStoreEndpointSecretKey: backup-object-store-endpoint
+    targetObjectStoreAccessKeySecretKey: backup-object-store-access-key
+    targetObjectStoreSecretKey: backup-object-store-secret-key
+    retentionDays: 365
+  promotion:
+    enabled: true
+    manualJobEnabled: false
+    endpoint: http://zkdeal-coordinator-standby:3000/hosting/v1/admin/promote
+    requiredReplayLsn: "REPLACE_WITH_FENCED_PRIMARY_FLUSH_LSN"
+    databaseUrlSecretKey: promotion-database-url
+    idempotencyKeySecretKey: promotion-idempotency-key
+    principalTokenSecretKey: promotion-principal-token
+    activeDeadlineSeconds: 240
+    controller:
+      enabled: true
+      armed: true
+      image: { repository: registry.example/zkdeal-promotion-controller, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+      activeHealthUrls:
+        - https://active-witness-a.service.example/hosting/v1/health
+        - https://active-witness-b.service.example/hosting/v1/health
+      standbyHealthUrl: http://zkdeal-coordinator-standby:3000/hosting/v1/health
+      failoverProviderUrl: https://zkdeal-failover-provider:8443/v1/failovers
+      candidateId: REPLACE_WITH_UNIQUE_INCIDENT_CANDIDATE
+      failureThreshold: 3
+      pollSeconds: 10
+      maxRtoSeconds: 240
+      maxCheckpointAgeSeconds: 30
+      requestTimeoutSeconds: 10
+      providerTokenSecretKey: failover-provider-token
+      approvalTokenSecretKey: failover-approval-token
+      principalTokenSecretKey: promotion-principal-token
+    provider:
+      enabled: true
+      platform: kubernetes
+      image: { repository: registry.example/zkdeal-failover-provider, tag: "", digest: "sha256:REPLACE", pullPolicy: IfNotPresent }
+      servicePort: 8443
+      activeHealthUrls:
+        - https://active-witness-a.service.example/hosting/v1/health
+        - https://active-witness-b.service.example/hosting/v1/health
+      standbyHealthUrl: http://zkdeal-coordinator-standby:3000/hosting/v1/health
+      indexerFreshnessUrl: REPLACE_WITH_OWNER_ADVERTISED_CANONICAL_INDEXER_FRESHNESS_URL
+      stateClaimName: zkdeal-failover-provider-state
+      tlsSecretName: zkdeal-failover-provider-tls
+      tlsCertKey: tls.crt
+      tlsPrivateKey: tls.key
+      providerTokenSecretKey: failover-provider-token
+      approvalTokenSecretKey: failover-approval-token
+      platformTimeoutSeconds: 120
+      requestTimeoutSeconds: 10
+      primaryDatabaseStatefulSet: postgresql-primary
+      primaryDatabasePod: postgresql-primary-0
+      standbyDatabasePod: postgresql-standby-0
+      postgresContainer: postgres
+      databaseService: postgresql-writer
+      applicationService: zkdeal-coordinator-writer
+      signerAuthorityDeployment: zkdeal-standby-signer-authority
+      routeScopeLabelKey: app.kubernetes.io/instance
+      routeScopeLabelValue: zkdeal
+      routeLabelKey: zkdeal.io/failover-target
+      standbyRouteValue: standby
+      pgUser: zkdeal
+      pgDatabase: zkdeal
+      pgData: /var/lib/postgresql/data
+      signerAuthority:
+        enabled: true
+        image: { repository: nginx, tag: "", digest: "sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10", pullPolicy: IfNotPresent }

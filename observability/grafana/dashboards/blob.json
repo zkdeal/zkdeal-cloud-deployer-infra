@@ -1,0 +1,21 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "panels": [
+    {"type":"stat","title":"Fenced publisher up","targets":[{"expr":"zkdeal_blob_publisher_up","refId":"A"}],"gridPos":{"h":6,"w":6,"x":0,"y":0}},
+    {"type":"stat","title":"Seconds since successful publisher pass","targets":[{"expr":"time() - zkdeal_blob_publisher_last_success_timestamp_seconds","refId":"A"}],"gridPos":{"h":6,"w":6,"x":6,"y":0}},
+    {"type":"timeseries","title":"Published durable operations","targets":[{"expr":"rate(zkdeal_blob_publish_processed_total[5m])","refId":"A"}],"gridPos":{"h":6,"w":6,"x":12,"y":0}},
+    {"type":"timeseries","title":"Publisher processing errors","targets":[{"expr":"increase(zkdeal_blob_publish_errors_total[10m])","refId":"A"}],"gridPos":{"h":6,"w":6,"x":18,"y":0}},
+    {"type":"stat","title":"Post-finality surprises (recovery required)","targets":[{"expr":"increase(zkdeal_l1_post_finality_surprise_total[6h])","refId":"A"}],"gridPos":{"h":7,"w":8,"x":0,"y":6}},
+    {"type":"stat","title":"Blob archives pending (owner contract required)","targets":[{"expr":"zkdeal_blob_archive_pending","refId":"A"}],"gridPos":{"h":7,"w":8,"x":8,"y":6}},
+    {"type":"timeseries","title":"Blob archive verification failures","targets":[{"expr":"sum by (reason) (rate(zkdeal_blob_archive_verification_failures_total[5m]))","refId":"A"}],"gridPos":{"h":7,"w":8,"x":16,"y":6}}
+  ],
+  "schemaVersion": 41,
+  "tags": ["zkdeal", "blob", "publisher", "archive", "partial-owner-contract"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "zkdeal blob publisher and archive",
+  "uid": "zkdeal-blob",
+  "version": 2
+}

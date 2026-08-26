@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "classification": "non-release-fixture",
+  "candidateId": "fixture-candidate-20260821",
+  "planSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "hostedIntegrationToken": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "faultControlTokenSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "allowedHosts": ["rpc-a", "rpc-b", "coordinator-active", "indexer"],
+  "rpcProviders": {
+    "rpc-a": "http://rpc-a:8545",
+    "rpc-b": "http://rpc-b:8545"
+  },
+  "docker": {
+    "socket": "/var/run/docker.sock",
+    "containerPrefix": "fixture-candidate-20260821-",
+    "restartTargets": {
+      "coordinator-active": "fixture-candidate-20260821-coordinator-active",
+      "indexer": "fixture-candidate-20260821-indexer",
+      "front-door": "fixture-candidate-20260821-front-door",
+      "rpc-a": "fixture-candidate-20260821-rpc-a",
+      "rpc-b": "fixture-candidate-20260821-rpc-b"
+    },
+    "partitionNetwork": "fixture-candidate-20260821-internal",
+    "partitionTargets": ["indexer"]
+  },
+  "loadProfiles": {
+    "rpc": {
+      "endpoints": [
+        {
+          "baseUrl": "http://coordinator-active:3000",
+          "path": "/hosting/v1/health",
+          "method": "GET",
+          "body": null,
+          "tokenFile": null,
+          "tokenSha256": null
+        }
+      ]
+    },
+    "indexer": {
+      "endpoints": [
+        {
+          "baseUrl": "http://indexer:3001",
+          "path": "/health",
+          "method": "GET",
+          "body": null,
+          "tokenFile": null,
+          "tokenSha256": null
+        }
+      ]
+    }
+  },
+  "requestTimeoutSeconds": 10
+}

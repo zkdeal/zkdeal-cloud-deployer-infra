@@ -1,0 +1,52 @@
+{
+  "images": {
+    "runner": "registry.invalid/zkdeal-soak-runner@sha256:REPLACE_WITH_64_HEX"
+  },
+  "candidate_id": "REPLACE_WITH_CANDIDATE_ID",
+  "hosted_integration_token": "sha256:REPLACE_WITH_64_HEX",
+  "topology_verification_file": "REPLACE_WITH_CANDIDATE_TOPOLOGY_VERIFICATION_JSON_PATH",
+  "topology_verification_sha256": "REPLACE_WITH_64_HEX",
+  "manifest_file": "REPLACE_WITH_RELEASE_SOAK_MANIFEST_JSON_PATH",
+  "manifest_sha256": "REPLACE_WITH_64_HEX",
+  "owner_command_file": "REPLACE_WITH_OWNER_SOAK_COMMAND_JSON_PATH",
+  "owner_command_sha256": "REPLACE_WITH_64_HEX",
+  "owner_driver_source_sha256": "REPLACE_WITH_64_HEX",
+  "auth_files": {
+    "tenant_a": "REPLACE_WITH_EPHEMERAL_TENANT_A_TOKEN_FILE",
+    "tenant_b": "REPLACE_WITH_EPHEMERAL_TENANT_B_TOKEN_FILE",
+    "node_a": "REPLACE_WITH_EPHEMERAL_NODE_A_TOKEN_FILE",
+    "node_b": "REPLACE_WITH_EPHEMERAL_NODE_B_TOKEN_FILE",
+    "l1_liveness": "REPLACE_WITH_EPHEMERAL_L1_LIVENESS_TOKEN_FILE",
+    "l1_room": "REPLACE_WITH_EPHEMERAL_L1_ROOM_TOKEN_FILE",
+    "l1_aggregate": "REPLACE_WITH_EPHEMERAL_L1_AGGREGATE_TOKEN_FILE",
+    "l1_sponsor": "REPLACE_WITH_EPHEMERAL_L1_SPONSOR_TOKEN_FILE",
+    "withdrawal": "REPLACE_WITH_EPHEMERAL_WITHDRAWAL_TOKEN_FILE",
+    "fault_control": "REPLACE_WITH_EPHEMERAL_FAULT_CONTROL_TOKEN_FILE",
+    "backup_restore": "REPLACE_WITH_EPHEMERAL_BACKUP_RESTORE_TOKEN_FILE",
+    "failover_control": "REPLACE_WITH_EPHEMERAL_FAILOVER_CONTROL_TOKEN_FILE",
+    "failover_approval": "REPLACE_WITH_EPHEMERAL_FAILOVER_APPROVAL_TOKEN_FILE"
+  },
+  "auth_token_sha256": {
+    "tenant_a": "REPLACE_WITH_64_HEX",
+    "tenant_b": "REPLACE_WITH_64_HEX",
+    "node_a": "REPLACE_WITH_64_HEX",
+    "node_b": "REPLACE_WITH_64_HEX",
+    "l1_liveness": "REPLACE_WITH_64_HEX",
+    "l1_room": "REPLACE_WITH_64_HEX",
+    "l1_aggregate": "REPLACE_WITH_64_HEX",
+    "l1_sponsor": "REPLACE_WITH_64_HEX",
+    "withdrawal": "REPLACE_WITH_64_HEX",
+    "fault_control": "REPLACE_WITH_64_HEX",
+    "backup_restore": "REPLACE_WITH_64_HEX",
+    "failover_control": "REPLACE_WITH_64_HEX",
+    "failover_approval": "REPLACE_WITH_64_HEX"
+  },
+  "deployment_addresses": {
+    "roomManager": "REPLACE_WITH_0X_40_HEX",
+    "operationsAccount": "REPLACE_WITH_0X_40_HEX",
+    "roomPool": "REPLACE_WITH_0X_40_HEX",
+    "sponsorAccount": "REPLACE_WITH_0X_40_HEX"
+  },
+  "duration_seconds": "43200",
+  "soak_command": "/opt/zkdeal-soak --submit-real-proof-jobs --restart --assert-durable-results,cursors,nonces,charges,sealed-output,safety,claims,fairness,deadlines --bounded-backoff --emit-evidence-closure"
+}

@@ -1,0 +1,37 @@
+{
+  "images": {
+    "server": "registry.invalid/zkdeal-coordinator@sha256:REPLACE_WITH_64_HEX",
+    "headless": "registry.invalid/zkdeal-headless-room-node@sha256:REPLACE_WITH_64_HEX",
+    "prover": "registry.invalid/zkdeal-prover@sha256:REPLACE_WITH_64_HEX",
+    "agent": "registry.invalid/zkdeal-prover-agent@sha256:REPLACE_WITH_64_HEX",
+    "postgres": "registry.invalid/postgres@sha256:REPLACE_WITH_64_HEX",
+    "minio": "registry.invalid/minio@sha256:REPLACE_WITH_64_HEX",
+    "minio_client": "registry.invalid/minio-mc@sha256:REPLACE_WITH_64_HEX"
+  },
+  "chain_id": "31337",
+  "l1_rpc_url_a": "http://host.docker.internal:8545",
+  "l1_rpc_url_b": "http://host.docker.internal:8546",
+  "l1_rpc_provider_ids": "local-anvil-a,local-anvil-b",
+  "beacon_sidecar_urls": "http://host.docker.internal:5052",
+  "room_manager": "REPLACE_WITH_ROOM_MANAGER_ADDRESS",
+  "room_pool": "REPLACE_WITH_ROOM_POOL_ADDRESS",
+  "access_token": "REPLACE_WITH_ACCESS_TOKEN_ADDRESS",
+  "prover_mode": "declared-fixture",
+  "node_id": "kurtosis-local-node-0",
+  "indexer_bootstrap_block": "finalized",
+  "secrets": {
+    "postgres_password": "REPLACE_WITH_LOCAL_POSTGRES_PASSWORD",
+    "minio_root_user": "REPLACE_WITH_LOCAL_MINIO_USER",
+    "minio_root_password": "REPLACE_WITH_LOCAL_MINIO_PASSWORD",
+    "api_key_pepper": "REPLACE_WITH_RANDOM_PEPPER_OF_AT_LEAST_32_CHARACTERS",
+    "indexer_token": "REPLACE_WITH_SCOPED_INDEXER_TOKEN",
+    "admission_token": "REPLACE_WITH_SCOPED_ADMISSION_TOKEN",
+    "queue_node_token": "REPLACE_WITH_SCOPED_QUEUE_NODE_TOKEN",
+    "prover_token": "REPLACE_WITH_SCOPED_PROVER_TOKEN"
+  },
+  "headless": {
+    "config_json": "REPLACE_WITH_EXACT_ROOM_NODE_CONFIG_JSON_REFERENCING_/tmp/zkdeal-room-node_PATHS",
+    "keys_json": "REPLACE_WITH_OPERATOR_OWNED_ROOM_NODE_KEYS_JSON",
+    "control_token": "REPLACE_WITH_OPERATOR_OWNED_CONTROL_TOKEN"
+  }
+}

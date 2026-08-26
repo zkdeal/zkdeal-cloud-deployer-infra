@@ -1,0 +1,137 @@
+{{- if .Values.operations.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-transactional-backup
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.operations.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.operations.backup.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.operations.backup.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: {{ .Values.operations.backup.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "zkdeal.labels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 70
+            runAsGroup: 70
+            fsGroup: 70
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: backup
+              image: {{ include "zkdeal.image" .Values.operations.backup.image | quote }}
+              imagePullPolicy: {{ .Values.operations.backup.image.pullPolicy }}
+              command: ["/usr/local/bin/live_backup.sh"]
+              env:
+                - { name: SOURCE_BUCKET, value: {{ .Values.operations.backup.sourceBucket | quote }} }
+                - { name: SOURCE_PREFIX, value: {{ .Values.operations.backup.sourcePrefix | quote }} }
+                - { name: BACKUP_BUCKET, value: {{ .Values.operations.backup.backupBucket | quote }} }
+                - { name: BACKUP_PREFIX, value: {{ .Values.operations.backup.backupPrefix | quote }} }
+                - { name: BACKUP_RETENTION_DAYS, value: {{ .Values.operations.backup.retentionDays | quote }} }
+                - name: DATABASE_URL
+                  valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.storage.databaseSecretKey }} } }
+                - name: SOURCE_OBJECT_STORE_ENDPOINT
+                  valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.storage.objectStoreEndpointSecretKey }} } }
+                - name: SOURCE_OBJECT_STORE_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.storage.objectStoreAccessKeySecretKey }} } }
+                - name: SOURCE_OBJECT_STORE_SECRET_KEY
+                  valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.storage.objectStoreSecretKey }} } }
+                - name: BACKUP_OBJECT_STORE_ENDPOINT
+                  valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.backup.targetObjectStoreEndpointSecretKey }} } }
+                - name: BACKUP_OBJECT_STORE_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.backup.targetObjectStoreAccessKeySecretKey }} } }
+                - name: BACKUP_OBJECT_STORE_SECRET_KEY
+                  valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.backup.targetObjectStoreSecretKey }} } }
+                - name: BACKUP_ENCRYPTION_KEY
+                  valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.backup.encryptionKeySecretKey }} } }
+              volumeMounts:
+                - { name: work, mountPath: /work }
+                - { name: tmp, mountPath: /tmp }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: ["ALL"] }
+              resources: {{ toYaml .Values.operations.backup.resources | nindent 16 }}
+          volumes:
+            - name: work
+              emptyDir: { sizeLimit: {{ .Values.operations.backup.workSize }} }
+            - name: tmp
+              emptyDir: { sizeLimit: 64Mi }
+{{- end }}
+{{- if .Values.operations.restore.enabled }}
+{{- if ne .Values.operations.restore.confirm (printf "RESTORE-%s" .Release.Name) }}{{ fail (printf "restore requires operations.restore.confirm=RESTORE-%s" .Release.Name) }}{{ end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-fresh-restore
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+  annotations: { helm.sh/hook: pre-install, helm.sh/hook-weight: "-5" }
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ .Values.operations.restore.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "zkdeal.labels" . | nindent 8 }}
+        app.kubernetes.io/component: restore
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: restore
+          image: {{ include "zkdeal.image" .Values.operations.restore.image | quote }}
+          imagePullPolicy: {{ .Values.operations.restore.image.pullPolicy }}
+          command: ["/usr/local/bin/live_restore.sh"]
+          env:
+            - { name: RESTORE_ID, value: {{ required "operations.restore.restoreId is required" .Values.operations.restore.restoreId | quote }} }
+            - { name: BACKUP_BUCKET, value: {{ .Values.operations.restore.backupBucket | quote }} }
+            - { name: BACKUP_PREFIX, value: {{ .Values.operations.restore.backupPrefix | quote }} }
+            - { name: TARGET_BUCKET, value: {{ .Values.operations.restore.targetBucket | quote }} }
+            - { name: TARGET_PREFIX, value: {{ .Values.operations.restore.targetPrefix | quote }} }
+            - name: TARGET_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.restore.targetDatabaseSecretKey }} } }
+            - name: BACKUP_OBJECT_STORE_ENDPOINT
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.restore.backupObjectStoreEndpointSecretKey }} } }
+            - name: BACKUP_OBJECT_STORE_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.restore.backupObjectStoreAccessKeySecretKey }} } }
+            - name: BACKUP_OBJECT_STORE_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.restore.backupObjectStoreSecretKey }} } }
+            - name: TARGET_OBJECT_STORE_ENDPOINT
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.restore.targetObjectStoreEndpointSecretKey }} } }
+            - name: TARGET_OBJECT_STORE_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.restore.targetObjectStoreAccessKeySecretKey }} } }
+            - name: TARGET_OBJECT_STORE_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.restore.targetObjectStoreSecretKey }} } }
+            - name: BACKUP_ENCRYPTION_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ .Values.operations.restore.encryptionKeySecretKey }} } }
+          volumeMounts:
+            - { name: work, mountPath: /work }
+            - { name: tmp, mountPath: /tmp }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources: {{ toYaml .Values.operations.restore.resources | nindent 12 }}
+      volumes:
+        - name: work
+          emptyDir: { sizeLimit: {{ .Values.operations.restore.workSize }} }
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }
+{{- end }}

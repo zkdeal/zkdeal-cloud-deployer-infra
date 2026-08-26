@@ -1,0 +1,7 @@
+{{- if eq .Values.profile "production" }}
+Production policy gates rendered successfully. Verify backup/restore and owner
+capability evidence before admitting traffic.
+{{- else }}
+This is a non-production render. Tag images and local filesystem authority do
+not constitute a production release.
+{{- end }}

@@ -1,0 +1,62 @@
+name: zkdeal-edge-acceptance
+
+x-backend: &backend
+  image: python@sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d
+  command: ["python", "/app/edge_backend.py"]
+  volumes: ["../tests/fixtures/edge_backend.py:/app/edge_backend.py:ro"]
+  read_only: true
+  tmpfs: ["/tmp:size=8m,mode=1777"]
+  cap_drop: ["ALL"]
+  security_opt: ["no-new-privileges:true"]
+  healthcheck:
+    test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/health"]
+    interval: 2s
+    timeout: 2s
+    retries: 20
+  networks: [edge]
+
+services:
+  writer-active:
+    <<: *backend
+    environment: { PORT: "3000", MODE: writer, WRITER_ID: active }
+    networks:
+      edge: { aliases: [coordinator-writer] }
+
+  writer-standby:
+    <<: *backend
+    environment: { PORT: "3000", MODE: writer, WRITER_ID: standby }
+
+  docs:
+    <<: *backend
+    environment: { PORT: "8080", MODE: docs, WRITER_ID: docs }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+
+  front-door:
+    image: ${FRONT_DOOR_IMAGE:-nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10}
+    user: "101:101"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["sh /opt/zkdeal/prepare-trusted-proxies.sh; exec nginx -g 'daemon off;' -c /etc/nginx/nginx.conf"]
+    environment: { REQUIRE_TRUSTED_PROXIES: "0" }
+    volumes:
+      - ../front-door/nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - ../front-door/nginx/prepare-trusted-proxies.sh:/opt/zkdeal/prepare-trusted-proxies.sh:ro
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=64m,mode=0777
+      - /var/run:size=1m
+      - /tmp:size=16m
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      writer-active: { condition: service_healthy }
+      docs: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8088/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [edge]
+
+networks:
+  edge: {}

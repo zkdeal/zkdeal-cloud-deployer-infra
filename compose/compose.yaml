@@ -1,0 +1,347 @@
+name: zkdeal-cloud-local
+
+x-owner-image: &owner-image
+  image: ${COORDINATOR_IMAGE:-zkdeal-coordinator:local}
+  build:
+    context: ../..
+    dockerfile: web2-api/server/Dockerfile
+
+x-common-security: &common-security
+  init: true
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  queue:
+    <<: [*owner-image, *common-security]
+    command: ["node", "dist/prove-queue/standalone.js"]
+    working_dir: /app/web2-api/server
+    environment:
+      QUEUE_PORT: "3005"
+      PORT: "3005"
+      QUEUE_HOST: 0.0.0.0
+      DATA_DIR: /var/lib/zkdeal
+      ZKDEAL_QUEUE_SUBMIT_TOKEN: ${ZKDEAL_QUEUE_SUBMIT_TOKEN:?set a local queue submit token}
+      ZKDEAL_QUEUE_NODE_TOKEN: ${ZKDEAL_QUEUE_NODE_TOKEN:?set a local queue node token}
+    volumes:
+      - type: bind
+        source: ${ZKDEAL_STATE_DIR:-../.state/local}/queue
+        target: /var/lib/zkdeal
+    ports:
+      - 127.0.0.1:${LOCAL_QUEUE_PORT:-3005}:3005
+    expose: ["3005"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks: [internal]
+
+  coordinator:
+    <<: [*owner-image, *common-security]
+    environment:
+      PORT: "3000"
+      HOST: 0.0.0.0
+      RELAY_PORT: "9001"
+      DEMO_ENABLED: "0"
+      CHAIN_ID: ${CHAIN_ID:-31337}
+      L1_RPC_URL: ${L1_RPC_URL:-http://host.docker.internal:8545}
+      L1_RPC_URLS: ${L1_RPC_URLS:-http://host.docker.internal:8545}
+      ROOM_MANAGER: ${ROOM_MANAGER:-0x0000000000000000000000000000000000000000}
+      ROOM_POOL: ${ROOM_POOL:-0x0000000000000000000000000000000000000000}
+      ACCESS_TOKEN: ${ACCESS_TOKEN:-0x0000000000000000000000000000000000000000}
+      DATA_DIR: /var/lib/zkdeal
+      COORDINATOR_ID: local-standalone
+      COORDINATOR_ROLE: standalone
+      QUEUE_ENABLED: "0"
+      QUEUE_URL: http://queue:3005
+      ZKDEAL_QUEUE_SUBMIT_TOKEN: ${ZKDEAL_QUEUE_SUBMIT_TOKEN:?set a local queue submit token}
+      ZKDEAL_QUEUE_NODE_TOKEN: ${ZKDEAL_QUEUE_NODE_TOKEN:?set a local queue node token}
+      CORS_ORIGINS: http://127.0.0.1:${PUBLIC_HTTP_PORT:-8088},http://localhost:${PUBLIC_HTTP_PORT:-8088}
+      MAX_ARCHIVE_LAG_BLOCKS: "8"
+    volumes:
+      - type: bind
+        source: ${ZKDEAL_STATE_DIR:-../.state/local}/coordinator
+        target: /var/lib/zkdeal
+    expose: ["3000", "9001"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      queue:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks:
+      internal:
+        aliases: [coordinator-writer]
+      egress: {}
+
+  docs:
+    <<: *common-security
+    image: ${DOCS_IMAGE:-zkdeal-operator-docs:local}
+    build:
+      context: ..
+      dockerfile: docs/Dockerfile
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 3s
+      retries: 8
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m
+      - /var/run:size=1m
+      - /tmp:size=16m
+    networks: [internal]
+
+  front-door:
+    <<: *common-security
+    image: ${NGINX_IMAGE:-nginx:1.27-alpine}
+    user: "101:101"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["sh /opt/zkdeal/prepare-trusted-proxies.sh; exec nginx -g 'daemon off;' -c /etc/nginx/nginx.conf"]
+    environment:
+      REQUIRE_TRUSTED_PROXIES: "0"
+    ports:
+      - 127.0.0.1:${PUBLIC_HTTP_PORT:-8088}:8088
+    volumes:
+      - ../front-door/nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - ../front-door/nginx/prepare-trusted-proxies.sh:/opt/zkdeal/prepare-trusted-proxies.sh:ro
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      docs:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8088/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=64m,mode=0777
+      - /var/run:size=1m
+      - /tmp:size=16m
+    networks: [edge, internal]
+
+  agent-stub:
+    <<: [*owner-image, *common-security]
+    profiles: ["smoke"]
+    image: ${AGENT_IMAGE:-zkdeal-prover-agent:local}
+    build:
+      context: ../..
+      dockerfile: cloud-deployer-infra/agent/Dockerfile
+      args:
+        AGENT_SOURCE_SHA256: ${AGENT_SOURCE_SHA256:?set the owner agent/src tree SHA-256}
+        AGENT_CAPABILITY_SHA256: ${AGENT_CAPABILITY_SHA256:?set the owner liveness capability SHA-256}
+        AGENT_TRACE_CAPABILITY_SHA256: ${AGENT_TRACE_CAPABILITY_SHA256:?set the owner trace capability SHA-256}
+    command: ["node", "/app/agent/agent.js"]
+    environment:
+      QUEUE_URL: http://queue:3005
+      ZKDEAL_QUEUE_NODE_TOKEN: ${ZKDEAL_QUEUE_NODE_TOKEN:?set a local queue node token}
+      NODE_ID: local-cpu-stub
+      ZKDEAL_AGENT_GPU: "0"
+      ZKDEAL_AGENT_STUB: ok:50
+      POLL_INTERVAL_MS: "250"
+    depends_on:
+      queue:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks: [internal]
+
+  prover:
+    <<: *common-security
+    profiles: ["gpu"]
+    image: ${PROVER_IMAGE:?set a verified prover image for the gpu profile}
+    command: ["serve", "--host", "0.0.0.0", "--port", "8080"]
+    environment:
+      RISC0_DEV_MODE: "0"
+      RISC0_PROVER: local
+      RISC0_REQUIRE_CUDA: "1"
+      CUDA_VISIBLE_DEVICES: "0"
+      ZKDEAL_PROVER_TOKEN: ${ZKDEAL_PROVER_TOKEN:?set a prover token}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/zkdeal-r0", "health"]
+      interval: 20s
+      timeout: 10s
+      retries: 30
+      start_period: 5m
+    networks: [internal]
+
+  agent:
+    <<: [*owner-image, *common-security]
+    profiles: ["gpu"]
+    image: ${AGENT_IMAGE:-zkdeal-prover-agent:local}
+    build:
+      context: ../..
+      dockerfile: cloud-deployer-infra/agent/Dockerfile
+      args:
+        AGENT_SOURCE_SHA256: ${AGENT_SOURCE_SHA256:?set the owner agent/src tree SHA-256}
+        AGENT_CAPABILITY_SHA256: ${AGENT_CAPABILITY_SHA256:?set the owner liveness capability SHA-256}
+        AGENT_TRACE_CAPABILITY_SHA256: ${AGENT_TRACE_CAPABILITY_SHA256:?set the owner trace capability SHA-256}
+    command: ["node", "/app/agent/agent.js"]
+    environment:
+      QUEUE_URL: http://queue:3005
+      ZKDEAL_QUEUE_NODE_TOKEN: ${ZKDEAL_QUEUE_NODE_TOKEN:?set a queue node token}
+      NODE_ID: ${NODE_ID:-local-gpu-0}
+      PROVER_URL: http://prover:8080
+      ZKDEAL_PROVER_TOKEN: ${ZKDEAL_PROVER_TOKEN:?set a prover token}
+      ZKDEAL_AGENT_GPU: "1"
+    depends_on:
+      queue:
+        condition: service_healthy
+      prover:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks: [internal, egress]
+
+  prometheus:
+    <<: *common-security
+    profiles: ["observability"]
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.5.0}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    volumes:
+      - ../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ../observability/prometheus/alerts.local.yml:/etc/prometheus/alerts.local.yml:ro
+      - type: bind
+        source: ${ZKDEAL_STATE_DIR:-../.state/local}/prometheus
+        target: /prometheus
+    ports:
+      - 127.0.0.1:${PROMETHEUS_PORT:-9090}:9090
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  alertmanager:
+    <<: *common-security
+    profiles: ["observability"]
+    image: ${ALERTMANAGER_IMAGE:-prom/alertmanager:v0.28.1}
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ../observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - type: bind
+        source: ${ZKDEAL_STATE_DIR:-../.state/local}/alertmanager
+        target: /alertmanager
+    expose: ["9093"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9093/-/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [internal]
+
+  webhook-sink:
+    <<: *common-security
+    profiles: ["observability"]
+    image: python:3.13-alpine@sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d
+    command: ["python", "/app/webhook-receiver.py"]
+    environment: { PORT: "9080" }
+    volumes:
+      - ../observability/webhook-receiver.py:/app/webhook-receiver.py:ro
+    expose: ["9080"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    read_only: true
+    tmpfs: ["/tmp:size=8m,mode=1777"]
+    networks: [internal]
+
+  loki:
+    <<: *common-security
+    profiles: ["logs"]
+    image: ${LOKI_IMAGE:-grafana/loki:3.5.3}
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - ../observability/loki.yml:/etc/loki/config.yml:ro
+      - type: bind
+        source: ${ZKDEAL_STATE_DIR:-../.state/local}/loki
+        target: /loki
+    expose: ["3100"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3100/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [internal]
+
+  promtail:
+    <<: *common-security
+    profiles: ["logs"]
+    image: ${PROMTAIL_IMAGE:-grafana/promtail:3.5.3}
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - ../observability/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - type: bind
+        source: ${ZKDEAL_STATE_DIR:-../.state/local}/promtail
+        target: /run/promtail
+    depends_on:
+      loki: { condition: service_healthy }
+    networks: [internal]
+
+  grafana:
+    <<: *common-security
+    profiles: ["observability"]
+    image: ${GRAFANA_IMAGE:-grafana/grafana:12.1.0}
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set a local Grafana password}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - 127.0.0.1:${GRAFANA_PORT:-3001}:3000
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+networks:
+  edge: {}
+  internal:
+    internal: true
+  egress: {}

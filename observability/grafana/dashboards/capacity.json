@@ -1,0 +1,21 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "panels": [
+    {"type":"stat","title":"Fenced capacity controller up","targets":[{"expr":"zkdeal_capacity_worker_up","refId":"A"}],"gridPos":{"h":6,"w":6,"x":0,"y":0}},
+    {"type":"stat","title":"Seconds since successful capacity pass","targets":[{"expr":"time() - zkdeal_capacity_worker_last_success_timestamp_seconds","refId":"A"}],"gridPos":{"h":6,"w":6,"x":6,"y":0}},
+    {"type":"timeseries","title":"Capacity controller runs","targets":[{"expr":"rate(zkdeal_capacity_worker_runs_total[5m])","refId":"A"}],"gridPos":{"h":6,"w":6,"x":12,"y":0}},
+    {"type":"timeseries","title":"Provider operations by bounded status","targets":[{"expr":"sum by (status) (rate(zkdeal_capacity_operations_total[5m]))","refId":"A"}],"gridPos":{"h":6,"w":6,"x":18,"y":0}},
+    {"type":"stat","title":"Deadline-risk operations","targets":[{"expr":"increase(zkdeal_capacity_operations_total{status=\"deadlineRisk\"}[10m])","refId":"A"}],"gridPos":{"h":7,"w":8,"x":0,"y":6}},
+    {"type":"stat","title":"Terminal operations","targets":[{"expr":"increase(zkdeal_capacity_operations_total{status=\"terminal\"}[10m])","refId":"A"}],"gridPos":{"h":7,"w":8,"x":8,"y":6}},
+    {"type":"stat","title":"Provider failures","targets":[{"expr":"increase(zkdeal_capacity_operations_total{status=\"failures\"}[10m])","refId":"A"}],"gridPos":{"h":7,"w":8,"x":16,"y":6}}
+  ],
+  "schemaVersion": 41,
+  "tags": ["zkdeal", "capacity", "provider", "owner-published"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "zkdeal hosted capacity controller",
+  "uid": "zkdeal-capacity",
+  "version": 1
+}

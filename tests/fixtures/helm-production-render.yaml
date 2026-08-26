@@ -1,0 +1,188 @@
+profile: production
+fullnameOverride: zkdeal
+ownerCapabilities:
+  protocolJournalSchema: 6
+  databaseSchema: 28
+  delegatedWorkerMutations: true
+  workerDeploymentStatus: owner-live-promotion-blob-publisher-and-withdrawal-gates-passed
+  blobArchivePrimitive: true
+  publisherBroadcastEntrypoint: true
+  publisherArchiveBeforeBroadcast: true
+  publisherDurableNonceJournal: true
+  publisherPostFinalitySurprise: RECOVERY_REQUIRED
+  autoClaimerEntrypoint: true
+  autoClaimerWorkerComponent: withdrawal
+  withdrawalAcceptanceStatus: owner-live-pg-exact-byte-restart-and-external-race-gates-passed
+  capacityEntrypoint: true
+  capacityWorkerComponent: capacity
+  capacityProviderProtocol: zkdeal-capacity-provider-v1
+  capacityAcceptanceStatus: owner-live-pg-minio-provider-and-queue-gates-passed
+  # Structural Helm fixture only. The digest is synthetic and is not owner
+  # acceptance evidence.
+  hostedAdmissionLease: true
+  hostedRoomBatchEnabled: true
+  hostedEngineToBatchInputV5: true
+  hostedDurablePostgresQueue: true
+  hostedExternalProver: true
+  hostedRestartResume: true
+  hostedFixturePrepare: false
+  hostedLegacyGroth16: false
+  hostedIntegrationAcceptanceToken: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+chain:
+  rpcUrls: "https://rpc-a.render.invalid,https://rpc-b.render.invalid"
+  rpcProviderIds: "render-independent-a,render-independent-b"
+  beaconSidecarUrls: "https://beacon-a.render.invalid,https://beacon-b.render.invalid"
+global:
+  existingSecret: zkdeal-render-test-secrets
+storage:
+  backend: external-transactional
+  fencing: owner-service-transactional
+availability:
+  mode: warm-standby
+  rtoMinutes: 4
+  activeCoordinatorId: zkdeal-render-primary
+  standbyCoordinatorId: zkdeal-render-standby
+externalServices:
+  signerRoles:
+    liveness: { address: "https://liveness.signer.test", signerAddress: "0x1111111111111111111111111111111111111111", cidrs: ["192.0.2.31/32"] }
+    operationsSettlement: { address: "https://operations.signer.test", cidrs: ["192.0.2.32/32"] }
+    payout: { address: "https://payout.signer.test", cidrs: ["192.0.2.33/32"] }
+    finalityOracle: { address: "https://finality.signer.test", cidrs: ["192.0.2.34/32"] }
+    sponsorRelayer: { address: "https://sponsor.signer.test", cidrs: ["192.0.2.35/32"] }
+    withdrawalRelayer: { address: "https://withdrawal.signer.test", signerAddress: "0x5555555555555555555555555555555555555555", cidrs: ["192.0.2.36/32"] }
+    blobPublisher: { address: "https://blob.signer.test", signerAddress: "0x4444444444444444444444444444444444444444", cidrs: ["192.0.2.37/32"] }
+components:
+  coordinatorActive:
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+    secretEnv: { NODE_LIVENESS_SIGNER_AUTH_TOKEN: node-liveness-signer-auth-token }
+  coordinatorStandby:
+    enabled: true
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+  queue:
+    enabled: false
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+  indexer:
+    enabled: true
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+    command: ["node", "dist/hosted-worker.js", "indexer"]
+  reconciler:
+    enabled: true
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+    command: ["node", "dist/hosted-worker.js", "reconciler"]
+  publisher:
+    enabled: true
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+    command: ["node", "dist/hosted-publisher-worker.js"]
+  headlessNode:
+    enabled: true
+    image: { repository: zkdeal-headless-room-node, digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+    command: ["node", "dist/cli.js", "run"]
+    roomNode:
+      configMapName: zkdeal-render-room-node-config
+      secretName: zkdeal-render-room-node-files
+      artifactClaimName: zkdeal-render-room-node-artifacts
+  prover:
+    enabled: true
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+  proverAgent:
+    enabled: true
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+  capacityController:
+    enabled: true
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+    command: ["node", "dist/hosted-capacity-worker.js", "run"]
+    env: { CAPACITY_PROVIDER_URL: "https://capacity-provider.render.invalid/v1" }
+    secretEnv: { CAPACITY_PROVIDER_AUTH_TOKEN: capacity-provider-auth-token }
+  autoClaimer:
+    enabled: true
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+    command: ["node", "dist/hosted-withdrawal-worker.js", "run"]
+    secretEnv: { WITHDRAWAL_SIGNER_AUTH_TOKEN: withdrawal-signer-auth-token }
+  docs:
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+ingress:
+  enabled: true
+  host: zkdeal.render.invalid
+  tls: { enabled: true, secretName: zkdeal-render-test-tls }
+monitoring:
+  serviceMonitor: { enabled: true, interval: 15s }
+  prometheusRule: { enabled: true }
+autoscaling:
+  enabled: true
+networkPolicy:
+  externalEgressCidrs: ["192.0.2.10/32", "198.51.100.20/32"]
+  operationalFlows:
+    backup: { cidrs: ["192.0.2.40/32", "192.0.2.41/32", "192.0.2.42/32"], ports: [443, 5432] }
+    restore: { cidrs: ["192.0.2.41/32", "192.0.2.42/32", "192.0.2.43/32"], ports: [443, 5432] }
+    migration: { cidrs: ["192.0.2.40/32"], ports: [5432] }
+    promotion: { cidrs: ["192.0.2.40/32"], ports: [5432] }
+    promotionController: { cidrs: ["192.0.2.44/32", "192.0.2.45/32", "192.0.2.46/32"], ports: [443] }
+    failoverProvider: { cidrs: ["192.0.2.44/32", "192.0.2.45/32", "192.0.2.47/32"], ports: [443] }
+    signerAuthority: { cidrs: ["192.0.2.32/32", "192.0.2.33/32", "192.0.2.34/32", "192.0.2.35/32", "192.0.2.36/32", "192.0.2.37/32"], ports: [443] }
+operations:
+  backup:
+    enabled: true
+    image: { digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+  promotion:
+    enabled: true
+    # Structural-only coverage of the separately rendered manual recovery Job.
+    manualJobEnabled: true
+    endpoint: http://zkdeal-coordinator-standby:3000/hosting/v1/admin/promote
+    requiredReplayLsn: "0/16B6C50"
+    databaseUrlSecretKey: promotion-database-url
+    idempotencyKeySecretKey: promotion-idempotency-key
+    principalTokenSecretKey: promotion-principal-token
+    activeDeadlineSeconds: 240
+    controller:
+      enabled: true
+      armed: true
+      image: { repository: zkdeal-promotion-controller, digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+      activeHealthUrls:
+        - https://active-witness-a.render.invalid/hosting/v1/health
+        - https://active-witness-b.render.invalid/hosting/v1/health
+      standbyHealthUrl: http://zkdeal-coordinator-standby:3000/hosting/v1/health
+      failoverProviderUrl: https://zkdeal-failover-provider:8443/v1/failovers
+      candidateId: render-candidate-20260821-001
+      failureThreshold: 3
+      pollSeconds: 10
+      maxRtoSeconds: 240
+      maxCheckpointAgeSeconds: 30
+      requestTimeoutSeconds: 10
+      providerTokenSecretKey: failover-provider-token
+      approvalTokenSecretKey: failover-approval-token
+      principalTokenSecretKey: promotion-principal-token
+    provider:
+      enabled: true
+      platform: kubernetes
+      image: { repository: zkdeal-failover-provider, digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }
+      servicePort: 8443
+      activeHealthUrls:
+        - https://active-witness-a.render.invalid/hosting/v1/health
+        - https://active-witness-b.render.invalid/hosting/v1/health
+      standbyHealthUrl: http://zkdeal-coordinator-standby:3000/hosting/v1/health
+      indexerFreshnessUrl: http://zkdeal-coordinator-standby:3000/hosting/v1/finality-status
+      stateClaimName: zkdeal-failover-provider-state
+      tlsSecretName: zkdeal-failover-provider-tls
+      tlsCertKey: tls.crt
+      tlsPrivateKey: tls.key
+      providerTokenSecretKey: failover-provider-token
+      approvalTokenSecretKey: failover-approval-token
+      platformTimeoutSeconds: 120
+      requestTimeoutSeconds: 10
+      primaryDatabaseStatefulSet: postgresql-primary
+      primaryDatabasePod: postgresql-primary-0
+      standbyDatabasePod: postgresql-standby-0
+      postgresContainer: postgres
+      databaseService: postgresql-writer
+      applicationService: zkdeal-coordinator-writer
+      signerAuthorityDeployment: zkdeal-standby-signer-authority
+      routeScopeLabelKey: app.kubernetes.io/instance
+      routeScopeLabelValue: zkdeal
+      routeLabelKey: zkdeal.io/failover-target
+      standbyRouteValue: standby
+      pgUser: zkdeal
+      pgDatabase: zkdeal
+      pgData: /var/lib/postgresql/data
+      signerAuthority:
+        enabled: true
+        image: { repository: nginx, digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111" }

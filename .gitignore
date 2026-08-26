@@ -1,0 +1,35 @@
+# Local configuration and operator-owned runtime state.
+.env
+.env.*
+!.env.example
+.state/
+evidence/
+
+# Python environments, bytecode, and test/tool caches.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local logs and reversible soak-test backups.
+*.log
+*.release-floor.bak
+
+# Platform/editor noise.
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Locally generated credentials and key material must never enter Git.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore

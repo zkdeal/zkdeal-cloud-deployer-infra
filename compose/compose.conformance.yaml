@@ -1,0 +1,124 @@
+x-conformance-service: &conformance-service
+  build:
+    context: ..
+    dockerfile: tests/fixtures/Conformance.Dockerfile
+  image: zkdeal-conformance-stub:local
+  profiles: ["conformance"]
+  restart: unless-stopped
+  read_only: true
+  tmpfs: ["/tmp:size=8m,mode=1777"]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  networks: [internal]
+
+services:
+  coordinator:
+    profiles: ["conformance"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-zkdeal}:${POSTGRES_PASSWORD:?set a local PostgreSQL password}@postgres:5432/${POSTGRES_DB:-zkdeal}
+      API_KEY_PEPPER: ${API_KEY_PEPPER:?set a local API-key pepper}
+      HOSTING_ADMIN_TOKEN: ${HOSTING_ADMIN_TOKEN:?set a local hosting admin token}
+      INDEXER_TOKEN: ${INDEXER_TOKEN:?set a local indexer token}
+      COORDINATOR_ROLE: active
+      COORDINATOR_ID: compose-active
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      queue: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/hosting/v1/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+  coordinator-standby:
+    image: ${COORDINATOR_IMAGE:-zkdeal-coordinator:local}
+    build:
+      context: ../..
+      dockerfile: web2-api/server/Dockerfile
+    profiles: ["conformance"]
+    command: ["node", "dist/index.js"]
+    working_dir: /app/web2-api/server
+    environment:
+      PORT: "3000"
+      HOST: 0.0.0.0
+      DEMO_ENABLED: "0"
+      CHAIN_ID: ${CHAIN_ID:-31337}
+      L1_RPC_URL: ${L1_RPC_URL:-http://host.docker.internal:8545}
+      L1_RPC_URLS: ${L1_RPC_URLS:-http://host.docker.internal:8545}
+      ROOM_MANAGER: ${ROOM_MANAGER:-0x0000000000000000000000000000000000000000}
+      ROOM_POOL: ${ROOM_POOL:-0x0000000000000000000000000000000000000000}
+      ACCESS_TOKEN: ${ACCESS_TOKEN:-0x0000000000000000000000000000000000000000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-zkdeal}:${POSTGRES_PASSWORD:?set a local PostgreSQL password}@postgres:5432/${POSTGRES_DB:-zkdeal}
+      API_KEY_PEPPER: ${API_KEY_PEPPER:?set a local API-key pepper}
+      HOSTING_ADMIN_TOKEN: ${HOSTING_ADMIN_TOKEN:?set a local hosting admin token}
+      INDEXER_TOKEN: ${INDEXER_TOKEN:?set a local indexer token}
+      COORDINATOR_ROLE: standby
+      COORDINATOR_ID: compose-standby
+      DATA_DIR: /var/lib/zkdeal
+    volumes:
+      - type: bind
+        source: ${ZKDEAL_STATE_DIR:-../.state/local}/coordinator-standby
+        target: /var/lib/zkdeal
+    expose: ["3000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/hosting/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    networks: [internal, egress]
+
+  indexer:
+    <<: *conformance-service
+    environment:
+      SERVICE_NAME: indexer
+      PORT: "3010"
+      DEPENDENCY_URLS: http://coordinator:3000/hosting/v1/ready,http://minio:9000/minio/health/live
+    expose: ["3010"]
+    healthcheck: { test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3010/ready"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on:
+      coordinator: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+
+  reconciler:
+    <<: *conformance-service
+    environment: { SERVICE_NAME: reconciler, PORT: "3011", DEPENDENCY_URLS: "http://indexer:3010/ready" }
+    expose: ["3011"]
+    healthcheck: { test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3011/ready"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { indexer: { condition: service_healthy } }
+
+  headless-node:
+    <<: *conformance-service
+    environment: { SERVICE_NAME: headless-node, PORT: "3020", DEPENDENCY_URLS: "http://coordinator:3000/hosting/v1/ready" }
+    expose: ["3020"]
+    healthcheck: { test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3020/ready"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { coordinator: { condition: service_healthy } }
+
+  # There are deliberately no tenant-api or sponsorship stub services: tenant,
+  # entitlement, and sponsorship-registration APIs are coordinator routes, and
+  # sponsor/finality L1 mutations are owner managed L1 operations executed on
+  # the coordinator plane. Conformance stubs exist only for real service slots.
+
+  capacity-controller:
+    <<: *conformance-service
+    # Test-only protocol-shape stub. The hosted overlay uses the real owner
+    # capacity worker and this service is never part of production rendering.
+    environment: { SERVICE_NAME: capacity-controller, PORT: "3032", DEPENDENCY_URLS: "http://coordinator:3000/hosting/v1/ready" }
+    expose: ["3032"]
+    healthcheck: { test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3032/ready"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { coordinator: { condition: service_healthy } }
+
+  auto-claimer:
+    <<: *conformance-service
+    # Test-only topology stub for the single owner auto-claimer boundary.
+    # Tenant withdrawal APIs are part of coordinator, not a second service.
+    environment: { SERVICE_NAME: auto-claimer, PORT: "3003", DEPENDENCY_URLS: "http://coordinator:3000/hosting/v1/ready" }
+    expose: ["3003"]
+    healthcheck: { test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3003/ready"], interval: 5s, timeout: 3s, retries: 20 }
+    depends_on: { coordinator: { condition: service_healthy } }

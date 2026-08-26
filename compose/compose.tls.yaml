@@ -1,0 +1,11 @@
+services:
+  front-door:
+    ports:
+      - ${PUBLIC_HTTPS_PORT:-8443}:8443
+    environment:
+      REQUIRE_TRUSTED_PROXIES: "1"
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:?set exact load-balancer CIDRs}
+    volumes:
+      - ../front-door/nginx/nginx.tls.conf:/etc/nginx/nginx.conf:ro
+      - ${TLS_CERT_FILE:?set TLS_CERT_FILE}:/run/secrets/tls.crt:ro
+      - ${TLS_KEY_FILE:?set TLS_KEY_FILE}:/run/secrets/tls.key:ro

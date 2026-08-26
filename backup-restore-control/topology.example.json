@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "classification": "non-release-fixture",
+  "candidateId": "fixture-candidate-20260821",
+  "planSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "hostedIntegrationToken": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "backupRestoreTokenSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "allowedHosts": ["postgres-source", "postgres-fresh", "minio-source", "minio-backup", "minio-fresh"],
+  "source": {
+    "postgres": {
+      "host": "postgres-source",
+      "port": 5432,
+      "database": "zkdeal",
+      "user": "zkdeal",
+      "passwordFile": "/run/secrets/source-postgres-password",
+      "passwordSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "minio": {
+      "endpoint": "http://minio-source:9000",
+      "accessKeyFile": "/run/secrets/source-minio-access-key",
+      "accessKeySha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "secretKeyFile": "/run/secrets/source-minio-secret-key",
+      "secretKeySha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "bucket": "zkdeal-source"
+    }
+  },
+  "backupStore": {
+    "endpoint": "http://minio-backup:9000",
+    "accessKeyFile": "/run/secrets/backup-minio-access-key",
+    "accessKeySha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "secretKeyFile": "/run/secrets/backup-minio-secret-key",
+    "secretKeySha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "bucket": "zkdeal-backups"
+  },
+  "encryption": {
+    "algorithm": "AES-256-GCM",
+    "keyFile": "/run/secrets/backup-encryption-key",
+    "keySha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "freshTargets": {
+    "fresh-primary": {
+      "postgres": {
+        "host": "postgres-fresh",
+        "port": 5432,
+        "database": "zkdeal",
+        "user": "zkdeal",
+        "passwordFile": "/run/secrets/fresh-postgres-password",
+        "passwordSha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "minio": {
+        "endpoint": "http://minio-fresh:9000",
+        "accessKeyFile": "/run/secrets/fresh-minio-access-key",
+        "accessKeySha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "secretKeyFile": "/run/secrets/fresh-minio-secret-key",
+        "secretKeySha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "bucket": "zkdeal-restored"
+      }
+    }
+  },
+  "processTimeoutSeconds": 900
+}

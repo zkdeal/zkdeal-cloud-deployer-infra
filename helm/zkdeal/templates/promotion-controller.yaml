@@ -1,0 +1,120 @@
+{{- $controller := .Values.operations.promotion.controller }}
+{{- if and .Values.operations.promotion.enabled $controller.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-promotion-controller
+  labels:
+    {{- include "zkdeal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: promotion-controller
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: promotion-controller
+  template:
+    metadata:
+      labels:
+        {{- include "zkdeal.labels" . | nindent 8 }}
+        app.kubernetes.io/component: promotion-controller
+      annotations:
+        checksum/runtime-secret-name: {{ .Values.global.existingSecret | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "zkdeal.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: promotion-controller
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                    app.kubernetes.io/component: promotion-controller
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: controller
+          image: {{ include "zkdeal.image" $controller.image | quote }}
+          imagePullPolicy: {{ $controller.image.pullPolicy }}
+          env:
+            - { name: ZKDEAL_VERIFIED_CONTAINER, value: "1" }
+            - { name: ACTIVE_HEALTH_URLS, value: {{ join "," $controller.activeHealthUrls | quote }} }
+            - { name: STANDBY_HEALTH_URL, value: {{ $controller.standbyHealthUrl | quote }} }
+            - { name: FAILOVER_PROVIDER_URL, value: {{ $controller.failoverProviderUrl | quote }} }
+            - { name: PROMOTION_ENDPOINT, value: {{ .Values.operations.promotion.endpoint | quote }} }
+            - { name: ACTIVE_COORDINATOR_ID, value: {{ .Values.availability.activeCoordinatorId | quote }} }
+            - { name: STANDBY_COORDINATOR_ID, value: {{ .Values.availability.standbyCoordinatorId | quote }} }
+            - { name: PROMOTION_CANDIDATE_ID, value: {{ $controller.candidateId | quote }} }
+            - { name: PROMOTION_CONTROLLER_ARMED, value: {{ ternary "true" "false" $controller.armed | quote }} }
+            - { name: FAILURE_THRESHOLD, value: {{ $controller.failureThreshold | quote }} }
+            - { name: POLL_SECONDS, value: {{ $controller.pollSeconds | quote }} }
+            - { name: MAX_MONITOR_CYCLES, value: "0" }
+            - { name: MAX_RTO_SECONDS, value: {{ $controller.maxRtoSeconds | quote }} }
+            - { name: MAX_CHECKPOINT_AGE_SECONDS, value: {{ $controller.maxCheckpointAgeSeconds | quote }} }
+            - { name: REQUEST_TIMEOUT_SECONDS, value: {{ $controller.requestTimeoutSeconds | quote }} }
+            - { name: PROMOTION_CONTROLLER_STATE_PATH, value: /tmp/promotion-controller-state.json }
+            - name: FAILOVER_PROVIDER_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ $controller.providerTokenSecretKey }} } }
+            - name: FAILOVER_APPROVAL_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ $controller.approvalTokenSecretKey }} } }
+            - name: PROMOTION_PRINCIPAL_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ .Values.global.existingSecret }}, key: {{ $controller.principalTokenSecretKey }} } }
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - >-
+                  import json,time; value=json.load(open('/tmp/promotion-controller-state.json'));
+                  assert (time.time()*1000-value['observedAtUnixMs']) < 180000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - >-
+                  import json; value=json.load(open('/tmp/promotion-controller-state.json'));
+                  assert value['status'] in {'monitoring','active-healthy','active-unhealthy','provider-fenced-and-promoted','owner-promoted','promotion-complete'}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources: {{ toYaml $controller.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 16Mi }
+{{- end }}

@@ -1,0 +1,31 @@
+groups:
+  - name: zkdeal.local-standalone-queue
+    rules:
+      - alert: ZkdealQueueDown
+        expr: up{job="prove-queue"} == 0
+        for: 2m
+        labels: { severity: critical, service: prove-queue, unit: boolean }
+        annotations:
+          summary: Local standalone prove queue is unavailable
+          runbook_url: /guides/monitoring-runbooks.md#zkdealqueuedown
+      - alert: ZkdealQueueStalled
+        expr: zkdeal_queue_oldest_waiting_age_seconds > 300
+        for: 10m
+        labels: { severity: critical, service: prove-queue, unit: seconds }
+        annotations:
+          summary: Oldest local proof job has waited longer than five minutes
+          runbook_url: /guides/monitoring-runbooks.md#zkdealqueuestalled
+      - alert: ZkdealQueueBacklog
+        expr: zkdeal_queue_jobs_waiting > 100
+        for: 15m
+        labels: { severity: warning, service: prove-queue, unit: jobs }
+        annotations:
+          summary: Local standalone proof queue backlog exceeds its rehearsal threshold
+          runbook_url: /guides/monitoring-runbooks.md#zkdealqueuebacklog
+      - alert: ZkdealQueueLeaseExpiryBurst
+        expr: increase(zkdeal_queue_leases_expired_total[10m]) > 5
+        for: 5m
+        labels: { severity: warning, service: prove-queue, unit: leases }
+        annotations:
+          summary: Local standalone prover leases are expiring repeatedly
+          runbook_url: /guides/monitoring-runbooks.md#zkdealqueueleaseexpiryburst

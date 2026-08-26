@@ -1,0 +1,331 @@
+{{- $provider := .Values.operations.promotion.provider }}
+{{- if and .Values.operations.promotion.enabled $provider.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-failover-provider
+  labels:
+    {{- include "zkdeal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: failover-provider
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-failover-provider
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames:
+      - {{ include "zkdeal.fullname" . }}-coordinator-active
+      - {{ $provider.signerAuthorityDeployment }}
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    resourceNames:
+      - {{ include "zkdeal.fullname" . }}-coordinator-active
+      - {{ $provider.signerAuthorityDeployment }}
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    resourceNames: [{{ $provider.primaryDatabaseStatefulSet }}]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets/scale"]
+    resourceNames: [{{ $provider.primaryDatabaseStatefulSet }}]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    resourceNames: [{{ $provider.primaryDatabasePod }}, {{ $provider.standbyDatabasePod }}]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    resourceNames: [{{ $provider.primaryDatabasePod }}, {{ $provider.standbyDatabasePod }}]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["services"]
+    resourceNames: [{{ $provider.databaseService }}, {{ $provider.applicationService }}]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-failover-provider
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "zkdeal.fullname" . }}-failover-provider
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "zkdeal.fullname" . }}-failover-provider
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-failover-provider
+  labels:
+    {{- include "zkdeal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: failover-provider
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: failover-provider
+  template:
+    metadata:
+      labels:
+        {{- include "zkdeal.labels" . | nindent 8 }}
+        app.kubernetes.io/component: failover-provider
+      annotations:
+        checksum/runtime-secret-name: {{ .Values.global.existingSecret | sha256sum }}
+        checksum/tls-secret-name: {{ $provider.tlsSecretName | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "zkdeal.fullname" . }}-failover-provider
+      automountServiceAccountToken: true
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: failover-provider
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                    app.kubernetes.io/component: failover-provider
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: failover-provider
+          image: {{ include "zkdeal.image" $provider.image | quote }}
+          imagePullPolicy: {{ $provider.image.pullPolicy }}
+          env:
+            - { name: ZKDEAL_VERIFIED_CONTAINER, value: "1" }
+            - { name: FAILOVER_PLATFORM, value: kubernetes }
+            - { name: ACTIVE_HEALTH_URLS, value: {{ join "," $provider.activeHealthUrls | quote }} }
+            - { name: STANDBY_HEALTH_URL, value: {{ $provider.standbyHealthUrl | quote }} }
+            - { name: INDEXER_FRESHNESS_URL, value: {{ $provider.indexerFreshnessUrl | quote }} }
+            - name: SIGNER_AUTHORITY_HEALTH_URLS
+              value: {{ printf "http://%s-standby-signer-authority:8080/health/operations,http://%s-standby-signer-authority:8080/health/payout,http://%s-standby-signer-authority:8080/health/finality,http://%s-standby-signer-authority:8080/health/sponsor,http://%s-standby-signer-authority:8080/health/withdrawal,http://%s-standby-signer-authority:8080/health/blob" (include "zkdeal.fullname" .) (include "zkdeal.fullname" .) (include "zkdeal.fullname" .) (include "zkdeal.fullname" .) (include "zkdeal.fullname" .) (include "zkdeal.fullname" .) | quote }}
+            - { name: ACTIVE_COORDINATOR_ID, value: {{ .Values.availability.activeCoordinatorId | quote }} }
+            - { name: STANDBY_COORDINATOR_ID, value: {{ .Values.availability.standbyCoordinatorId | quote }} }
+            - { name: FAILOVER_PROVIDER_TOKEN_FILE, value: /run/zkdeal-provider/secrets/provider-token }
+            - { name: FAILOVER_APPROVAL_TOKEN_FILE, value: /run/zkdeal-provider/secrets/approval-token }
+            - { name: FAILOVER_PROVIDER_TLS_CERT_FILE, value: /run/zkdeal-provider/tls/tls.crt }
+            - { name: FAILOVER_PROVIDER_TLS_KEY_FILE, value: /run/zkdeal-provider/tls/tls.key }
+            - { name: FAILOVER_PROVIDER_STATE_PATH, value: /var/lib/zkdeal-failover-provider/state.json }
+            - { name: FAILOVER_PROVIDER_LISTEN_PORT, value: {{ $provider.servicePort | quote }} }
+            - { name: REQUEST_TIMEOUT_SECONDS, value: {{ $provider.requestTimeoutSeconds | quote }} }
+            - { name: PLATFORM_TIMEOUT_SECONDS, value: {{ $provider.platformTimeoutSeconds | quote }} }
+            - { name: K8S_FAILOVER_NAMESPACE, value: {{ .Release.Namespace | quote }} }
+            - { name: K8S_ACTIVE_DEPLOYMENT, value: {{ printf "%s-coordinator-active" (include "zkdeal.fullname" .) | quote }} }
+            - { name: K8S_STANDBY_DEPLOYMENT, value: {{ printf "%s-coordinator-standby" (include "zkdeal.fullname" .) | quote }} }
+            - { name: K8S_PRIMARY_DB_STATEFULSET, value: {{ $provider.primaryDatabaseStatefulSet | quote }} }
+            - { name: K8S_PRIMARY_DB_POD, value: {{ $provider.primaryDatabasePod | quote }} }
+            - { name: K8S_STANDBY_DB_POD, value: {{ $provider.standbyDatabasePod | quote }} }
+            - { name: K8S_POSTGRES_CONTAINER, value: {{ $provider.postgresContainer | quote }} }
+            - { name: K8S_DATABASE_SERVICE, value: {{ $provider.databaseService | quote }} }
+            - { name: K8S_APPLICATION_SERVICE, value: {{ $provider.applicationService | quote }} }
+            - { name: K8S_SIGNER_DEPLOYMENT, value: {{ $provider.signerAuthorityDeployment | quote }} }
+            - { name: K8S_ROUTE_SCOPE_LABEL_KEY, value: {{ $provider.routeScopeLabelKey | quote }} }
+            - { name: K8S_ROUTE_SCOPE_LABEL_VALUE, value: {{ $provider.routeScopeLabelValue | quote }} }
+            - { name: K8S_ROUTE_LABEL_KEY, value: {{ $provider.routeLabelKey | quote }} }
+            - { name: K8S_STANDBY_ROUTE_VALUE, value: {{ $provider.standbyRouteValue | quote }} }
+            - { name: FAILOVER_PGUSER, value: {{ $provider.pgUser | quote }} }
+            - { name: FAILOVER_PGDATABASE, value: {{ $provider.pgDatabase | quote }} }
+            - { name: FAILOVER_PGDATA, value: {{ $provider.pgData | quote }} }
+          ports: [{ name: https, containerPort: {{ $provider.servicePort }} }]
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import ssl,urllib.request; urllib.request.urlopen('https://127.0.0.1:{{ $provider.servicePort }}/health',context=ssl._create_unverified_context(),timeout=2)"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["python", "-c", "import ssl,urllib.request; urllib.request.urlopen('https://127.0.0.1:{{ $provider.servicePort }}/ready',context=ssl._create_unverified_context(),timeout=2)"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources: {{ toYaml $provider.resources | nindent 12 }}
+          volumeMounts:
+            - { name: state, mountPath: /var/lib/zkdeal-failover-provider }
+            - { name: runtime-secrets, mountPath: /run/zkdeal-provider/secrets, readOnly: true }
+            - { name: tls, mountPath: /run/zkdeal-provider/tls, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: state
+          persistentVolumeClaim: { claimName: {{ $provider.stateClaimName }} }
+        - name: runtime-secrets
+          projected:
+            # Root-owned projected secrets are readable only through the
+            # provider pod's dedicated fsGroup; no world-readable bits.
+            defaultMode: 0440
+            sources:
+              - secret:
+                  name: {{ .Values.global.existingSecret }}
+                  items:
+                    - { key: {{ $provider.providerTokenSecretKey }}, path: provider-token }
+                    - { key: {{ $provider.approvalTokenSecretKey }}, path: approval-token }
+        - name: tls
+          secret:
+            secretName: {{ $provider.tlsSecretName }}
+            defaultMode: 0440
+            items:
+              - { key: {{ $provider.tlsCertKey }}, path: tls.crt }
+              - { key: {{ $provider.tlsPrivateKey }}, path: tls.key }
+        - name: tmp
+          emptyDir: { sizeLimit: 16Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-failover-provider
+  labels:
+    {{- include "zkdeal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: failover-provider
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: failover-provider
+  ports:
+    - { name: https, port: {{ $provider.servicePort }}, targetPort: https }
+{{- if $provider.signerAuthority.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-standby-signer-authority
+  labels: {{ include "zkdeal.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    worker_processes 1;
+    pid /tmp/nginx.pid;
+    error_log /dev/stderr notice;
+    events { worker_connections 256; }
+    http {
+      access_log /dev/stdout;
+      client_body_temp_path /tmp/client_body;
+      proxy_temp_path /tmp/proxy;
+      proxy_connect_timeout 2s;
+      proxy_read_timeout 10s;
+      proxy_ssl_server_name on;
+      server {
+        listen 8080;
+        {{- range $path, $role := dict "operations" "operationsSettlement" "payout" "payout" "finality" "finalityOracle" "sponsor" "sponsorRelayer" "withdrawal" "withdrawalRelayer" "blob" "blobPublisher" }}
+        location = /health/{{ $path }} { proxy_pass {{ (index $.Values.externalServices.signerRoles $role).address }}/upcheck; }
+        location /{{ $path }}/ { proxy_pass {{ (index $.Values.externalServices.signerRoles $role).address }}/; }
+        {{- end }}
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-standby-signer-authority
+  labels:
+    {{- include "zkdeal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: standby-signer-authority
+spec:
+  replicas: 0
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: standby-signer-authority
+  template:
+    metadata:
+      labels:
+        {{- include "zkdeal.labels" . | nindent 8 }}
+        app.kubernetes.io/component: standby-signer-authority
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: standby-signer-authority
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                    app.kubernetes.io/component: standby-signer-authority
+      containers:
+        - name: signer-authority
+          image: {{ include "zkdeal.image" $provider.signerAuthority.image | quote }}
+          imagePullPolicy: {{ $provider.signerAuthority.image.pullPolicy }}
+          command: ["nginx", "-c", "/etc/nginx/nginx.conf", "-g", "daemon off;"]
+          ports: [{ name: http, containerPort: 8080 }]
+          livenessProbe: { tcpSocket: { port: http }, periodSeconds: 10 }
+          readinessProbe: { tcpSocket: { port: http }, periodSeconds: 5 }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources: {{ toYaml $provider.signerAuthority.resources | nindent 12 }}
+          volumeMounts:
+            - { name: config, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: config
+          configMap: { name: {{ include "zkdeal.fullname" . }}-standby-signer-authority }
+        - name: tmp
+          emptyDir: { sizeLimit: 16Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "zkdeal.fullname" . }}-standby-signer-authority
+  labels:
+    {{- include "zkdeal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: standby-signer-authority
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: standby-signer-authority
+  ports: [{ name: http, port: 8080, targetPort: http }]
+{{- end }}
+{{- end }}

@@ -1,0 +1,8 @@
+.env
+.state
+evidence
+__pycache__
+*.pyc
+kurtosis
+helm/**
+!helm/zkdeal/files/promotion_gate.sh

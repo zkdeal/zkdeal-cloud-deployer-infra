@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "REPLACE_WITH_LOWERCASE_CANDIDATE_ID",
+  "candidateDescriptorSha256": null,
+  "passed": false,
+  "records": {
+    "sourceTransferVerification": {"path": null, "sha256": null},
+    "sourceClosure": {"path": null, "sha256": null},
+    "stagedZkvmImages": {"path": null, "sha256": null},
+    "generatedTrustRootClosure": {"path": null, "sha256": null},
+    "sourceGeneratedCompositeSeal": {"path": null, "sha256": null},
+    "trustRootPrePromotionCheck": {"path": null, "sha256": null},
+    "proverRuntimePublication": {"path": null, "sha256": null},
+    "proverRuntimePromotionVerification": {"path": null, "sha256": null},
+    "ownerDurableCapabilities": {"path": null, "sha256": null},
+    "freshDeploymentAddresses": {"path": null, "sha256": null},
+    "singleCalldataReceipt": {"path": null, "sha256": null},
+    "singleBlobReceipt": {"path": null, "sha256": null},
+    "aggregateSevenPlusOneReceipt": {"path": null, "sha256": null},
+    "withdrawalReceipt": {"path": null, "sha256": null},
+    "sponsorshipRenewalReceipt": {"path": null, "sha256": null},
+    "qualifiedGasReport": {"path": null, "sha256": null},
+    "failoverReorgRecovery": {"path": null, "sha256": null},
+    "soakVerification": {"path": null, "sha256": null}
+  }
+}

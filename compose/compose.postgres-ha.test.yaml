@@ -1,0 +1,132 @@
+name: zkdeal-postgres-ha-acceptance
+
+x-postgres-common: &postgres-common
+  image: zkdeal-postgres-ha-fixture:acceptance
+  build:
+    context: ..
+    dockerfile: tests/fixtures/PostgresHa.Dockerfile
+    args:
+      POSTGRES_BASE: ${POSTGRES_HA_BASE_IMAGE:-postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94}
+  environment:
+    POSTGRES_DB: zkdeal
+    POSTGRES_USER: zkdeal
+    POSTGRES_PASSWORD: postgres-ha-acceptance-password
+    PGPASSWORD: replication-acceptance-password
+    PGDATA: /var/lib/postgresql/data
+  cap_drop: ["ALL"]
+  cap_add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: ["/tmp:size=64m,mode=1777"]
+  networks: [database]
+
+x-standby: &standby
+  <<: *postgres-common
+  entrypoint: ["/bin/sh", "/opt/zkdeal/standby-entrypoint.sh"]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U zkdeal -d zkdeal && test \"$$(psql -U zkdeal -d zkdeal -tAc 'select pg_is_in_recovery()')\" = t"]
+    interval: 2s
+    timeout: 3s
+    retries: 60
+    start_period: 10s
+
+services:
+  pg-primary:
+    <<: *postgres-common
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - wal_keep_size=64MB
+    volumes:
+      - pg-primary:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zkdeal -d zkdeal"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+    networks:
+      database: { aliases: [postgres-writer] }
+
+  pg-standby:
+    <<: *standby
+    environment:
+      POSTGRES_DB: zkdeal
+      POSTGRES_USER: zkdeal
+      POSTGRES_PASSWORD: postgres-ha-acceptance-password
+      PGPASSWORD: replication-acceptance-password
+      PGDATA: /var/lib/postgresql/data
+      PRIMARY_HOST: pg-primary
+      REPLICATION_SLOT: zkdeal_standby
+      PGAPPNAME: zkdeal_standby
+    volumes:
+      - pg-standby:/var/lib/postgresql/data
+    depends_on:
+      pg-primary: { condition: service_healthy }
+
+  pg-reseeded-replica:
+    <<: *standby
+    profiles: ["reseed"]
+    environment:
+      POSTGRES_DB: zkdeal
+      POSTGRES_USER: zkdeal
+      POSTGRES_PASSWORD: postgres-ha-acceptance-password
+      PGPASSWORD: replication-acceptance-password
+      PGDATA: /var/lib/postgresql/data
+      PRIMARY_HOST: postgres-writer
+      REPLICATION_SLOT: zkdeal_reseeded
+      PGAPPNAME: zkdeal_reseeded
+    volumes:
+      - pg-reseeded:/var/lib/postgresql/data
+
+  promotion-owner:
+    profiles: ["promotion"]
+    build:
+      context: ..
+      dockerfile: tests/fixtures/Promotion.Dockerfile
+    environment:
+      PORT: "3000"
+      PROMOTION_TEST_TOKEN: promotion-acceptance-admin-token
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/hosting/v1/health',timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [database]
+
+  promotion-gate:
+    profiles: ["promotion"]
+    image: zkdeal-postgres-ha-fixture:acceptance
+    build:
+      context: ..
+      dockerfile: tests/fixtures/PostgresHa.Dockerfile
+    command: ["/bin/sh", "/opt/zkdeal/promotion_gate.sh"]
+    environment:
+      PROMOTION_ENDPOINT: http://promotion-owner:3000/hosting/v1/admin/promote
+      PROMOTION_DATABASE_URL: postgresql://zkdeal:postgres-ha-acceptance-password@postgres-writer:5432/zkdeal
+      PROMOTION_REQUIRED_REPLAY_LSN: "${PROMOTION_REQUIRED_REPLAY_LSN:-0/0}"
+      PROMOTION_IDEMPOTENCY_KEY: "${PROMOTION_IDEMPOTENCY_KEY:-promotion-acceptance-key-0001}"
+      PROMOTION_PRINCIPAL_TOKEN: promotion-acceptance-admin-token
+      PROMOTION_STANDBY_COORDINATOR_ID: zkdeal-acceptance-standby
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    networks: [database]
+
+volumes:
+  pg-primary: {}
+  pg-standby: {}
+  pg-reseeded: {}
+
+networks:
+  database: {}

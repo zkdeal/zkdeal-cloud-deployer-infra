@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.zkdeal.invalid/schemas/hosting-json-rpc.schema.json",
+  "title": "zkdeal hosted JSON-RPC request or response",
+  "description": "Transport schema for the owner-published hosted JSON-RPC surface. Named result definitions document the records returned by each request family.",
+  "oneOf": [
+    { "$ref": "#/$defs/request" },
+    { "$ref": "#/$defs/successResponse" },
+    { "$ref": "#/$defs/errorResponse" }
+  ],
+  "$defs": {
+    "id": { "type": ["string", "integer", "null"] },
+    "decimal": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "hash32": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+    "tenantId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$" },
+    "emptyParams": { "type": "object", "additionalProperties": false, "maxProperties": 0 },
+    "factPageParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "roomId": { "$ref": "#/$defs/decimal" },
+        "after": { "$ref": "#/$defs/decimal", "default": "0" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 200 }
+      }
+    },
+    "request": {
+      "oneOf": [
+        { "$ref": "#/$defs/capabilitiesRequest" },
+        { "$ref": "#/$defs/emptyRequest" },
+        { "$ref": "#/$defs/canonicalBlockRequest" },
+        { "$ref": "#/$defs/canonicalBlocksRequest" },
+        { "$ref": "#/$defs/roomRequest" },
+        { "$ref": "#/$defs/roomEventsRequest" },
+        { "$ref": "#/$defs/factPageRequest" },
+        { "$ref": "#/$defs/transactionRequest" },
+        { "$ref": "#/$defs/withdrawalsRequest" },
+        { "$ref": "#/$defs/withdrawalProofRequest" },
+        { "$ref": "#/$defs/usageRequest" },
+        { "$ref": "#/$defs/limitRequest" },
+        { "$ref": "#/$defs/adminBackfillRequest" },
+        { "$ref": "#/$defs/adminRetentionRequest" }
+      ]
+    },
+    "capabilitiesRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" },
+        "method": { "const": "hosting_capabilities" }, "params": { "$ref": "#/$defs/emptyParams" }
+      }
+    },
+    "emptyRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" },
+        "method": { "enum": ["zkdeal_getIndexerStatus", "zkdeal_getFinalityStatus"] },
+        "params": { "$ref": "#/$defs/emptyParams" }
+      }
+    },
+    "canonicalBlockRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" }, "method": { "const": "zkdeal_getCanonicalBlock" },
+        "params": { "type": "object", "additionalProperties": false, "required": ["number"], "properties": { "number": { "$ref": "#/$defs/decimal" } } }
+      }
+    },
+    "canonicalBlocksRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" }, "method": { "enum": ["zkdeal_getCanonicalBlocks", "zkdeal_getBlocks"] },
+        "params": { "type": "object", "additionalProperties": false, "properties": { "fromBlock": { "$ref": "#/$defs/decimal" }, "limit": { "type": "integer", "minimum": 1, "maximum": 1000 } } }
+      }
+    },
+    "roomRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" }, "method": { "enum": ["zkdeal_getRoom", "zkdeal_getReconciliationStatus", "zkdeal_adminReconcile"] },
+        "params": { "type": "object", "additionalProperties": false, "required": ["roomId"], "properties": { "roomId": { "$ref": "#/$defs/decimal" } } }
+      }
+    },
+    "roomEventsRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" }, "method": { "const": "zkdeal_getRoomEvents" },
+        "params": { "type": "object", "additionalProperties": false, "properties": {
+          "roomId": { "$ref": "#/$defs/decimal" }, "after": { "$ref": "#/$defs/decimal" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 1000 },
+          "kinds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" } }
+        } }
+      }
+    },
+    "factPageRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" },
+        "method": { "enum": ["zkdeal_getDeposits", "zkdeal_getImports", "zkdeal_getAdmissions", "zkdeal_getBatches"] },
+        "params": { "$ref": "#/$defs/factPageParams" }
+      }
+    },
+    "transactionRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" }, "method": { "enum": ["zkdeal_getTransaction", "zkdeal_getTransactions"] },
+        "params": { "type": "object", "additionalProperties": false, "required": ["transactionHash"], "properties": { "transactionHash": { "$ref": "#/$defs/hash32" } } }
+      }
+    },
+    "withdrawalsRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" }, "method": { "const": "zkdeal_getWithdrawals" },
+        "params": { "type": "object", "additionalProperties": false, "properties": {
+          "roomId": { "$ref": "#/$defs/decimal" }, "status": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 1000 }
+        } }
+      }
+    },
+    "withdrawalProofRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" },
+        "method": { "enum": ["zkdeal_getWithdrawalProof", "zkdeal_getProof", "zkdeal_requestWithdrawalClaim"] },
+        "params": { "type": "object", "additionalProperties": false, "required": ["roomId", "epoch", "withdrawalIndex"], "properties": {
+          "roomId": { "$ref": "#/$defs/decimal" }, "epoch": { "$ref": "#/$defs/decimal" }, "withdrawalIndex": { "$ref": "#/$defs/decimal" }
+        } }
+      }
+    },
+    "usageRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" }, "method": { "enum": ["zkdeal_getUsage", "hosting_usage"] },
+        "params": { "type": "object", "additionalProperties": false, "properties": {
+          "tenantId": { "$ref": "#/$defs/tenantId" }, "after": { "$ref": "#/$defs/decimal" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 1000 }
+        } }
+      }
+    },
+    "limitRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" },
+        "method": { "enum": ["zkdeal_getEntitlements", "zkdeal_getSponsorships", "zkdeal_getCapacity"] },
+        "params": { "type": "object", "additionalProperties": false, "properties": { "limit": { "type": "integer", "minimum": 1, "maximum": 1000 } } }
+      }
+    },
+    "adminBackfillRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" }, "method": { "const": "zkdeal_adminBackfill" },
+        "params": { "type": "object", "additionalProperties": false, "required": ["fromBlock"], "properties": { "fromBlock": { "$ref": "#/$defs/decimal" } } }
+      }
+    },
+    "adminRetentionRequest": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "method"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" }, "method": { "const": "zkdeal_adminRetention" },
+        "params": { "type": "object", "additionalProperties": false, "properties": {
+          "transientRetentionDays": { "type": "integer", "minimum": 30 },
+          "auditRetentionDays": { "type": "integer", "minimum": 365 },
+          "resolvedSafetyRetentionDays": { "type": "integer", "minimum": 30 }
+        } }
+      }
+    },
+    "canonicalBlock": {
+      "type": "object", "additionalProperties": false, "required": ["number", "hash", "parentHash"],
+      "properties": { "number": { "$ref": "#/$defs/decimal" }, "hash": { "$ref": "#/$defs/hash32" }, "parentHash": { "$ref": "#/$defs/hash32" }, "observedAt": { "type": "string", "format": "date-time" } }
+    },
+    "indexerFact": {
+      "type": "object", "required": ["factId", "factKey", "factKind", "blockNumber", "blockHash", "payload"],
+      "properties": {
+        "factId": { "$ref": "#/$defs/decimal" }, "factKey": { "type": "string" }, "factKind": { "type": "string" },
+        "roomId": { "oneOf": [{ "$ref": "#/$defs/decimal" }, { "type": "null" }] }, "tenantId": { "type": ["string", "null"] },
+        "blockNumber": { "$ref": "#/$defs/decimal" }, "blockHash": { "$ref": "#/$defs/hash32" }, "payload": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "withdrawal": {
+      "type": "object", "required": ["chainId", "roomId", "epoch", "withdrawalIndex", "recipient", "asset", "amount", "withdrawalRoot", "leafHash", "status"],
+      "properties": {
+        "chainId": { "$ref": "#/$defs/decimal" }, "roomId": { "$ref": "#/$defs/decimal" }, "epoch": { "$ref": "#/$defs/decimal" },
+        "withdrawalIndex": { "$ref": "#/$defs/decimal" }, "tenantId": { "type": ["string", "null"] }, "approverEpoch": { "$ref": "#/$defs/decimal" },
+        "recipient": { "type": "string" }, "asset": { "type": "string" }, "amount": { "$ref": "#/$defs/decimal" },
+        "withdrawalRoot": { "$ref": "#/$defs/hash32" }, "leafHash": { "$ref": "#/$defs/hash32" }, "positionalProof": { "type": "array", "items": { "$ref": "#/$defs/hash32" } },
+        "finalizedBlock": { "$ref": "#/$defs/decimal" }, "finalizedHash": { "$ref": "#/$defs/hash32" }, "status": { "type": "string" }
+      }
+    },
+    "usageEntry": {
+      "type": "object", "required": ["usageId", "tenantId", "unit", "quantity", "observedAt", "idempotencyKey", "metadata"],
+      "properties": {
+        "usageId": { "$ref": "#/$defs/decimal" }, "tenantId": { "$ref": "#/$defs/tenantId" },
+        "allocationId": { "type": ["string", "null"] }, "jobId": { "type": ["string", "null"] },
+        "roomId": { "oneOf": [{ "$ref": "#/$defs/decimal" }, { "type": "null" }] }, "unit": { "type": "string" },
+        "quantity": { "$ref": "#/$defs/decimal" }, "observedAt": { "type": "string", "format": "date-time" },
+        "idempotencyKey": { "type": "string" }, "metadata": { "type": "object" }
+      }
+    },
+    "successResponse": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "result"],
+      "properties": { "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" }, "result": {} }
+    },
+    "errorResponse": {
+      "type": "object", "additionalProperties": false, "required": ["jsonrpc", "id", "error"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" }, "id": { "$ref": "#/$defs/id" },
+        "error": { "type": "object", "additionalProperties": false, "required": ["code", "message"], "properties": {
+          "code": { "enum": [-32600, -32601, -32602, -32003, -32004] }, "message": { "type": "string", "minLength": 1 }, "data": {}
+        } }
+      }
+    }
+  }
+}

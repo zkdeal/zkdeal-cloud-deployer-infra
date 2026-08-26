@@ -1,0 +1,173 @@
+# Owner event and calldata to indexer mapping
+
+Generated from `web2-api/server/src/hosted-indexer.ts`. Categories are owner-defined, and this deployment project does not decode or project protocol state itself.
+
+## RoomManager events
+
+| Event | Projection category |
+|---|---|
+| `AdmissionOmissionChallenged` | `admission` |
+| `AdmissionReceiptDischarged` | `admission` |
+| `AdmissionRecorded` | `admission` |
+| `AggregateMemberOutcome` | `aggregate` |
+| `AggregateProofConfigured` | `configuration` |
+| `ApproverChangeQueued` | `approver` |
+| `BatchAccepted` | `batch` |
+| `ChallengePayoutClaimed` | `challenge` |
+| `ColdTemplateDataPublished` | `capacity` |
+| `DataAvailabilityAccepted` | `data-availability` |
+| `DataAvailabilityConfigured` | `data-availability` |
+| `DeadlineGracePurchased` | `renewal` |
+| `DepositQueued` | `deposit` |
+| `DepositRefunded` | `deposit` |
+| `FacetConfigured` | `configuration` |
+| `ForcedOutcomeRecorded` | `forced-transaction` |
+| `ForcedTransactionQueued` | `forced-transaction` |
+| `Initialized` | `configuration` |
+| `L1StateInputPublished` | `import` |
+| `LivenessAttested` | `liveness` |
+| `OmissionChallengeOpened` | `challenge` |
+| `OmissionChallengeRepaired` | `challenge` |
+| `OmissionChallengeSettled` | `challenge` |
+| `ProtocolFeeAccrued` | `fee` |
+| `ProtocolFeeConfigured` | `configuration` |
+| `ProtocolFeeMadeClaimable` | `fee` |
+| `ProtocolFeeReversed` | `fee` |
+| `ProtocolFeesClaimed` | `fee` |
+| `RecoveryBatchAccepted` | `recovery` |
+| `RoleAdminChanged` | `governance` |
+| `RoleGranted` | `governance` |
+| `RoleRevoked` | `governance` |
+| `RoomClosedByRecovery` | `recovery` |
+| `RoomCreated` | `room` |
+| `RoomOwnershipAssigned` | `handoff` |
+| `ServiceBondFunded` | `escrow` |
+| `ServiceBondWithdrawn` | `escrow` |
+| `Upgraded` | `governance` |
+| `WithdrawalClaimed` | `withdrawal` |
+| `WithdrawalRootPublished` | `withdrawal` |
+
+## RoomManager state-changing calls
+
+| Call | Projection category |
+|---|---|
+| `applyAggregateMember` | `aggregate` |
+| `applyVerifiedBatch` | `batch` |
+| `attestLiveness` | `liveness` |
+| `challengeOmittedAdmission` | `challenge` |
+| `claimChallengePayout` | `challenge` |
+| `claimProtocolFees` | `fee` |
+| `claimWithdrawal` | `withdrawal` |
+| `closeInertRoom` | `recovery` |
+| `configureFacets` | `configuration` |
+| `createManagedRoom` | `room` |
+| `createManagedRoomWithDataAvailability` | `room` |
+| `createRoom` | `room` |
+| `createRoomWithDataAvailability` | `room` |
+| `dischargeAdmissionReceipt` | `admission` |
+| `forceTransaction` | `forced-transaction` |
+| `fundServiceBond` | `escrow` |
+| `grantRole` | `governance` |
+| `initialize` | `configuration` |
+| `publishL1StateInput` | `import` |
+| `purchaseDeadlineGrace` | `renewal` |
+| `queueApproverChange` | `approver` |
+| `queueDeposit` | `deposit` |
+| `refundExpiredDeposit` | `deposit` |
+| `renounceRole` | `governance` |
+| `revokeRole` | `governance` |
+| `setAggregateProofConfig` | `aggregate` |
+| `setProtocolFee` | `configuration` |
+| `settleOmissionChallenge` | `challenge` |
+| `submitAggregate` | `aggregate` |
+| `submitBatch` | `batch` |
+| `submitBatchWithDataAvailability` | `data-availability` |
+| `submitRecoveryBatch` | `recovery` |
+| `upgradeToAndCall` | `governance` |
+| `validateBatch` | `batch` |
+| `withdrawServiceBond` | `escrow` |
+
+## RoomPool events
+
+| Event | Projection category |
+|---|---|
+| `AllocationDisposed` | `allocation` |
+| `AllocationRenewed` | `renewal` |
+| `AllocationReserved` | `allocation` |
+| `AllocationUsed` | `allocation` |
+| `CapacityProfileConfirmed` | `capacity` |
+| `CapacityProfileRequested` | `capacity` |
+| `ColdPreparationCancelled` | `capacity` |
+| `ColdPreparationCompleted` | `capacity` |
+| `ColdPreparationRequested` | `capacity` |
+| `FinalizedCheckpointRecorded` | `finality` |
+| `HostingFacetConfigured` | `configuration` |
+| `Initialized` | `configuration` |
+| `NodeAuthoritiesConfigured` | `node` |
+| `NodeDrainStarted` | `node-lifecycle` |
+| `NodeRegistered` | `node` |
+| `NodeRetired` | `node-lifecycle` |
+| `NodeStatusChanged` | `node` |
+| `Paused` | `governance` |
+| `PriceEpochPublished` | `pricing` |
+| `RoleAdminChanged` | `governance` |
+| `RoleGranted` | `governance` |
+| `RoleRevoked` | `governance` |
+| `RunningCreditAdded` | `escrow` |
+| `RunningFeesSettled` | `metering` |
+| `ServiceFeesClaimed` | `escrow` |
+| `SlotConfigured` | `capacity` |
+| `SponsoredEscrowFunded` | `sponsorship` |
+| `TreasuryFeesClaimed` | `escrow` |
+| `Unpaused` | `governance` |
+| `Upgraded` | `governance` |
+
+## RoomPool state-changing calls
+
+| Call | Projection category |
+|---|---|
+| `beginNodeDrain` | `node-lifecycle` |
+| `cancelColdPreparation` | `capacity` |
+| `claimServiceFees` | `escrow` |
+| `claimTreasuryFees` | `escrow` |
+| `completeColdPreparation` | `capacity` |
+| `configureHostingFacet` | `configuration` |
+| `configureNodeAuthorities` | `node` |
+| `configureSlot` | `capacity` |
+| `confirmCapacityProfile` | `capacity` |
+| `disposeRoom` | `allocation` |
+| `grantRole` | `governance` |
+| `initialize` | `configuration` |
+| `markNodeStale` | `node` |
+| `pause` | `governance` |
+| `publishPriceEpoch` | `pricing` |
+| `quarantineNode` | `node` |
+| `recordFinalizedCheckpoint` | `finality` |
+| `registerNode` | `node` |
+| `registerPreset` | `capacity` |
+| `renewRoomForWithPermit` | `renewal` |
+| `renewRoomWithPermit` | `renewal` |
+| `renounceRole` | `governance` |
+| `reportNodeHeartbeat` | `node` |
+| `requestCapacityProfile` | `capacity` |
+| `requestColdPreparationForWithPermit` | `capacity` |
+| `requestColdPreparationWithPermit` | `capacity` |
+| `reserveAndStartForWithDataAvailabilityWithPermit` | `data-availability` |
+| `reserveAndStartForWithPermit` | `sponsorship` |
+| `reserveAndStartWithDataAvailabilityWithPermit` | `data-availability` |
+| `reserveAndStartWithPermit` | `allocation` |
+| `reserveRoomForWithPermit` | `sponsorship` |
+| `reserveRoomWithPermit` | `allocation` |
+| `retireNode` | `node-lifecycle` |
+| `revokeRole` | `governance` |
+| `setNodeDelegate` | `node` |
+| `settleRunningFees` | `metering` |
+| `startReservedRoom` | `allocation` |
+| `startReservedRoomWithDataAvailability` | `data-availability` |
+| `topUpRunningCredit` | `escrow` |
+| `unpause` | `governance` |
+| `upgradeToAndCall` | `governance` |
+
+## Source hash
+
+- `web2-api/server/src/hosted-indexer.ts` — `sha256:3afcb9aa32f216e53753e2e38414c035d3f4b95f456a5622097ea623f1e8756c`

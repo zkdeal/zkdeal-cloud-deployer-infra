@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "name": "local",
+  "environment": "local",
+  "publicExposure": false,
+  "chain": {
+    "id": 31337,
+    "rpcUrls": ["http://host.docker.internal:8545"],
+    "contracts": {
+      "roomManager": "0x0000000000000000000000000000000000000000",
+      "roomPool": "0x0000000000000000000000000000000000000000",
+      "accessToken": "0x0000000000000000000000000000000000000000"
+    },
+    "maximumArchiveLagBlocks": 8
+  },
+  "services": {
+    "coordinator": { "enabled": true, "replicas": 1, "port": 3000, "healthPath": "/health" },
+    "queue": { "enabled": true, "replicas": 1, "port": 3005, "healthPath": "/health" },
+    "prover": { "enabled": false, "replicas": 0, "port": 8080, "healthPath": "/healthz" },
+    "agent": { "enabled": false, "replicas": 0, "port": 9091, "healthPath": "/health" },
+    "docs": { "enabled": true, "replicas": 1, "port": 8080, "healthPath": "/" }
+  },
+  "storage": {
+    "backend": "filesystem",
+    "dataRoot": ".state/local",
+    "backupRoot": ".state/local/backups",
+    "retentionDays": 14,
+    "hotRetentionDays": 14,
+    "archiveRetentionDays": 14
+  },
+  "availability": {
+    "mode": "single-instance",
+    "fencing": "none",
+    "rpoMinutes": 1440,
+    "rtoMinutes": 60,
+    "multiRegion": false,
+    "warmStandbyReplicas": 0
+  },
+  "security": {
+    "tlsMode": "disabled",
+    "trustedProxyCidrs": [],
+    "corsOrigins": ["http://127.0.0.1:8088", "http://localhost:8088"],
+    "secretSource": "dotenv-local",
+    "existingSecret": null
+  },
+  "observability": {
+    "enabled": true,
+    "scrapeIntervalSeconds": 15,
+    "alertsEnabled": true,
+    "externalLabels": { "environment": "local" }
+  },
+  "images": {
+    "manifest": "config/images.lock.json",
+    "overrides": "config/images.local.example.json",
+    "allowTagOverrides": true
+  }
+}

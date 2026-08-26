@@ -1,0 +1,137 @@
+{
+  "apiRoutes": 133,
+  "contracts": 11,
+  "generator": "scripts/render_reference_docs.py",
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "path": "web2-api/server/src/admission.ts",
+      "routes": 2,
+      "sha256": "1d13d8228afc638e9d3f9a577454a8ba957878e1e486490fb2725f0684bf0424"
+    },
+    {
+      "path": "web2-api/server/src/app-assets.ts",
+      "routes": 3,
+      "sha256": "fe25dcab8a3156765cca107cff578acdce5d7ab6dd8acab5bebc1427b2d33e05"
+    },
+    {
+      "path": "web2-api/server/src/app-config-routes.ts",
+      "routes": 2,
+      "sha256": "08d966e592f6e05491a94d588c7440f1137c84b5a4a7936485de2309220dd4c8"
+    },
+    {
+      "path": "web2-api/server/src/app-rpc-route.ts",
+      "routes": 1,
+      "sha256": "11bcc5d0e1544af31eafa24b95c8ed879605de2e39ef147c6a5ba37ee772c4a5"
+    },
+    {
+      "path": "web2-api/server/src/app.ts",
+      "routes": 1,
+      "sha256": "954b36d0162a64c809ed6737ccea1c62db6cd4787dc300e28df3e9899dddf114"
+    },
+    {
+      "path": "web2-api/server/src/demo-routes.ts",
+      "routes": 18,
+      "sha256": "8437de6de65e4d272d936cffb843f56c9d89e547d0486b4e145fedf1de16bddf"
+    },
+    {
+      "path": "web2-api/server/src/hosting-routes.ts",
+      "routes": 69,
+      "sha256": "efa0883ec74aeddb65bda24f36f372f696d797fa02959b8d625b973b0869520d"
+    },
+    {
+      "path": "web2-api/server/src/metrics.ts",
+      "routes": 1,
+      "sha256": "25f9fce8e8954ca3fae8c86d2b857059ccc97bbafb45c1d90e0edc028aa13bbc"
+    },
+    {
+      "path": "web2-api/server/src/observer-write.ts",
+      "routes": 2,
+      "sha256": "4d904cd645de7af5cfe35d75440adae4190972c1a7fdb8ada033c6b5e0f76a70"
+    },
+    {
+      "path": "web2-api/server/src/observer.ts",
+      "routes": 15,
+      "sha256": "3129625f7c68201017673b3840bc06158b54f9d55f99d28ee7050a71cd182c3c"
+    },
+    {
+      "path": "web2-api/server/src/prove-queue/postgres-queue-routes.ts",
+      "routes": 8,
+      "sha256": "4da9561b1da476196779f19dcc4d4d779d9a21c93d1167fa85e1a5c993ec5ab8"
+    },
+    {
+      "path": "web2-api/server/src/prove-queue/queue-routes.ts",
+      "routes": 9,
+      "sha256": "5008a5554a79a0ea93a90c7ff8064bc57f56ffeff8f6ff8e6f05d91138e60772"
+    },
+    {
+      "path": "web2-api/server/src/prove-queue/standalone.ts",
+      "routes": 2,
+      "sha256": "bde3b920736fe63b2abf4888f1838f2cd1b0c8ce6fdb2e0a071415246a34738f"
+    },
+    {
+      "path": "web3-protocol/contracts/out/l1/RoomManager.sol/RoomManager.json",
+      "sha256": "2b94c6661bad8112eb3a538cdd68aa96cdff698afc2d93a08136db2621d3b457"
+    },
+    {
+      "path": "web3-protocol/contracts/out/RoomManagerBatchFacet.sol/RoomManagerBatchFacet.json",
+      "sha256": "a1b14a3573a7b6751e6289a228bcdc69cea05f3ca9774091b284f384ba8323cd"
+    },
+    {
+      "path": "web3-protocol/contracts/out/RoomManagerChallengeFacet.sol/RoomManagerChallengeFacet.json",
+      "sha256": "4109d0c05cd3615dbce5d78c780ead30b76fb10cf3dea83caf216cc955258e19"
+    },
+    {
+      "path": "web3-protocol/contracts/out/RoomManagerHostingFacet.sol/RoomManagerHostingFacet.json",
+      "sha256": "78519eeeac5e9d0ca85aec01c9c10ba8186719e5f991581ef75e4aeb321a2f68"
+    },
+    {
+      "path": "web3-protocol/contracts/out/RoomManagerIntakeFacet.sol/RoomManagerIntakeFacet.json",
+      "sha256": "09c6fa651efd359630c1ee421ab2cb3bfc9b217015d75c3f3c13230607ea5c11"
+    },
+    {
+      "path": "web3-protocol/contracts/out/RoomManagerImportFacet.sol/RoomManagerImportFacet.json",
+      "sha256": "c42e88065b71a659add6d8d74d6a8d01757941ea07e71fca3174048fa8c1acf5"
+    },
+    {
+      "path": "web3-protocol/contracts/out/RoomManagerObservationFacet.sol/RoomManagerObservationFacet.json",
+      "sha256": "b5656c796f326ca5a56e1be9c0a5d78e6f1e92d5765d8e7757a6d22705bbb909"
+    },
+    {
+      "path": "web3-protocol/contracts/out/RoomManagerValidationFacet.sol/RoomManagerValidationFacet.json",
+      "sha256": "9181769d3bd7edaa0d3bb02c916a741cb14383f11fee347f9f6945baa4a56ffa"
+    },
+    {
+      "path": "web3-protocol/contracts/out/RoomPoolManager.sol/RoomPoolManager.json",
+      "sha256": "3b304db144926a2540a053b632ad4dd26c320225b2bfc00144af3bf1c2b779c9"
+    },
+    {
+      "path": "web3-protocol/contracts/out/RoomPoolHostingFacet.sol/RoomPoolHostingFacet.json",
+      "sha256": "6dec143e526cbac3d2157e255a12f2815c5e804e5b9c9d4972faf6c271d80ae6"
+    },
+    {
+      "path": "web3-protocol/contracts/out/RoomPoolNodeRegistry.sol/RoomPoolNodeRegistry.json",
+      "sha256": "043cdf44dc4062863f2542126ea6e06faf5669d6fdab78b1ae0dc8f60991a24f"
+    },
+    {
+      "path": "web2-api/server/src/hosted-indexer.ts",
+      "sha256": "3afcb9aa32f216e53753e2e38414c035d3f4b95f456a5622097ea623f1e8756c"
+    },
+    {
+      "path": "web2-api/server/capabilities/hosted-service.json",
+      "sha256": "43b0c8046b9a508a92a8f9802d3f67f29fbae5a80751002fcb6915d2d01fac1e"
+    },
+    {
+      "path": "app-node/packages/room-node/capabilities/room-node.json",
+      "sha256": "050134b04857c70b8a7494cdae0b18d39d3712c0a1d02b719708d8c7abe139ec"
+    },
+    {
+      "path": "web2-api/server/capabilities/capacity-provider-v1.openapi.json",
+      "sha256": "9824c3465937cce1dbd573aea07be04e8c3d9e61bb69db95da2bf7c7415627ac"
+    },
+    {
+      "path": "web2-api/server/capabilities/hosting-v1.openapi.json",
+      "sha256": "bf77a5952167deaf27b7b89bdec95609d8ef5ff47b89d7cfc2001ad11bdd3584"
+    }
+  ]
+}

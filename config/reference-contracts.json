@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "contracts": [
+    "RoomManager",
+    "RoomManagerBatchFacet",
+    "RoomManagerChallengeFacet",
+    "RoomManagerHostingFacet",
+    "RoomManagerIntakeFacet",
+    "RoomManagerImportFacet",
+    "RoomManagerObservationFacet",
+    "RoomManagerValidationFacet",
+    "RoomPoolManager",
+    "RoomPoolHostingFacet",
+    "RoomPoolNodeRegistry"
+  ]
+}

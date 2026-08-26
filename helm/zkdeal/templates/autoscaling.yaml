@@ -1,0 +1,33 @@
+{{- if .Values.autoscaling.enabled }}
+{{- range $name, $policy := .Values.autoscaling.components }}
+{{- $component := index $.Values.components $name }}
+{{- if and $component $component.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $name }}
+  labels: {{ include "zkdeal.labels" $ | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "zkdeal.fullname" $ }}-{{ kebabcase $name }}
+  minReplicas: {{ $policy.minReplicas }}
+  maxReplicas: {{ $policy.maxReplicas }}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies: [{ type: Percent, value: 100, periodSeconds: 60 }]
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies: [{ type: Percent, value: 25, periodSeconds: 300 }]
+  metrics:
+    - type: External
+      external:
+        metric: { name: {{ $policy.metricName }} }
+        target: { type: AverageValue, averageValue: {{ $policy.targetAverageValue | quote }} }
+{{- end }}
+{{- end }}
+{{- end }}
+

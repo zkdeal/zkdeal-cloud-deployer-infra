@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "candidateId": "REPLACE_WITH_LOWERCASE_CANDIDATE_ID",
+  "candidateDescriptorSha256": null,
+  "physicalEvidenceManifestSha256": null,
+  "passed": false,
+  "gates": {
+    "yellowPaperPdfRender": false,
+    "yellowPaperStyle": false,
+    "yellowPaperForbiddenHistory": false,
+    "yellowPaperVisualQa": false,
+    "investorDeckExactlyTwelveSlides": false,
+    "investorDeckEditableShapes": false,
+    "investorDeckNotesAndHiddenXml": false,
+    "investorDeckOverflow": false,
+    "investorDeckVisualFidelity": false,
+    "currentFrontFaceNoVersionNarrative": false
+  },
+  "artifacts": {
+    "yellowPaperSourceManifest": {"path": null, "sha256": null},
+    "yellowPaperPdf": {"path": null, "sha256": null},
+    "yellowPaperQaReport": {"path": null, "sha256": null},
+    "investorDeckPptx": {"path": null, "sha256": null},
+    "investorDeckQaReport": {"path": null, "sha256": null}
+  }
+}

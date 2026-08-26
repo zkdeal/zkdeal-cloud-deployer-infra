@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zkdeal.local/schemas/candidate-private-topology-v1.json",
+  "title": "zkdeal candidate private topology",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "candidateId", "candidateDescriptorSha256", "hostedIntegrationToken", "ownerDatabaseSchema", "platform", "bridge", "adapterCapabilities", "endpoints", "workloads", "databaseHa", "failoverControl"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "candidateId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{7,79}$"},
+    "candidateDescriptorSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "hostedIntegrationToken": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "ownerDatabaseSchema": {"type": "integer", "minimum": 1},
+    "platform": {"enum": ["compose", "kubernetes"]},
+    "bridge": {"$ref": "#/$defs/bridge"},
+    "adapterCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["faultControl", "backupRestore"],
+      "properties": {
+        "faultControl": {"$ref": "#/$defs/capabilityBinding"},
+        "backupRestore": {"$ref": "#/$defs/capabilityBinding"}
+      }
+    },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/endpoint"},
+      "minProperties": 11,
+      "maxProperties": 11
+    },
+    "workloads": {
+      "type": "object",
+      "minProperties": 15,
+      "additionalProperties": {"$ref": "#/$defs/workload"}
+    },
+    "databaseHa": {"$ref": "#/$defs/databaseHa"},
+    "failoverControl": {"$ref": "#/$defs/failoverControl"}
+  },
+  "$defs": {
+    "bridge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "networkIdentity", "privateOnly", "lanExposed", "removeAfterRun", "candidateStackShared"],
+      "properties": {
+        "mode": {"enum": ["docker-desktop-host-gateway", "kurtosis-network-attach", "kubernetes-private-gateway"]},
+        "networkIdentity": {"type": "string", "minLength": 3, "maxLength": 200},
+        "privateOnly": {"const": true},
+        "lanExposed": {"const": false},
+        "removeAfterRun": {"const": true},
+        "candidateStackShared": {"const": true}
+      }
+    },
+    "capabilityBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "sourceSha256", "image"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^[^/].*\\.json$"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "sourceSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "image": {"type": "string", "pattern": "^[^@]+@sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "workload"],
+      "properties": {
+        "url": {"type": "string", "pattern": "^https?://"},
+        "workload": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{2,79}$"}
+      }
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "imageKey", "imageRef", "runtimeId", "identity", "ready", "private", "chainId"],
+      "properties": {
+        "kind": {"enum": ["docker", "kubernetes", "external"]},
+        "imageKey": {"type": ["string", "null"]},
+        "imageRef": {"type": ["string", "null"]},
+        "runtimeId": {"type": ["string", "null"]},
+        "identity": {"type": "string", "minLength": 1, "maxLength": 300},
+        "ready": {"const": true},
+        "private": {"const": true},
+        "chainId": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "databaseHa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primaryWorkload", "standbyWorkload", "independentInstances", "targetLsn", "replayLsn", "caughtUp", "formerPrimaryFenced"],
+      "properties": {
+        "primaryWorkload": {"type": "string"},
+        "standbyWorkload": {"type": "string"},
+        "independentInstances": {"const": true},
+        "targetLsn": {"type": "string", "pattern": "^[0-9A-F]+/[0-9A-F]+$"},
+        "replayLsn": {"type": "string", "pattern": "^[0-9A-F]+/[0-9A-F]+$"},
+        "caughtUp": {"const": true},
+        "formerPrimaryFenced": {"const": true}
+      }
+    },
+    "failoverControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["activeCoordinatorId", "standbyCoordinatorId", "activeWitnesses", "standbyHealth", "promotionEndpoint", "failureThreshold", "maxRtoSeconds", "independentWitnesses", "scopedApprovalRequired", "standbySignerlessBeforeFence"],
+      "properties": {
+        "activeCoordinatorId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,199}$"},
+        "standbyCoordinatorId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,199}$"},
+        "activeWitnesses": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"$ref": "#/$defs/endpoint"}
+        },
+        "standbyHealth": {"$ref": "#/$defs/endpoint"},
+        "promotionEndpoint": {"$ref": "#/$defs/endpoint"},
+        "failureThreshold": {"type": "integer", "minimum": 3, "maximum": 20},
+        "maxRtoSeconds": {"type": "integer", "minimum": 30, "maximum": 300},
+        "independentWitnesses": {"const": true},
+        "scopedApprovalRequired": {"const": true},
+        "standbySignerlessBeforeFence": {"const": true}
+      }
+    }
+  }
+}

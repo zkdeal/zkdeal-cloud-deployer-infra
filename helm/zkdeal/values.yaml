@@ -1,0 +1,528 @@
+profile: local
+nameOverride: ""
+fullnameOverride: ""
+
+ownerCapabilities:
+  manifest: web2-api/server/capabilities/hosted-service.json
+  protocolJournalSchema: 6
+  databaseSchema: 28
+  filesystemApplicationStateAuthority: false
+  dataDirRequired: false
+  readOnlyRootSupported: true
+  legacyObserverRoutes: retired-410
+  observationAuthority: postgresql-canonical-projection
+  delegatedWorkerMutations: true
+  workerDeploymentStatus: owner-live-promotion-blob-publisher-and-withdrawal-gates-passed
+  blobArchivePrimitive: true
+  publisherBroadcastEntrypoint: true
+  publisherArchiveBeforeBroadcast: true
+  publisherDurableNonceJournal: true
+  publisherPostFinalitySurprise: RECOVERY_REQUIRED
+  autoClaimerEntrypoint: true
+  autoClaimerWorkerComponent: withdrawal
+  withdrawalAcceptanceStatus: owner-live-pg-exact-byte-restart-and-external-race-gates-passed
+  capacityEntrypoint: true
+  capacityWorkerComponent: capacity
+  capacityProviderProtocol: zkdeal-capacity-provider-v1
+  capacityAcceptanceStatus: owner-live-pg-minio-provider-and-queue-gates-passed
+  # Pinned to the owner room-node hosted contract
+  # (app-node/packages/room-node/capabilities/room-node.json modes.hosted and
+  # hosted-service.json managedL1Operations.roomBatch).
+  hostedAdmissionLease: true
+  hostedRoomBatchEnabled: true
+  hostedEngineToBatchInputV5: true
+  hostedDurablePostgresQueue: true
+  hostedExternalProver: true
+  hostedRestartResume: true
+  hostedFixturePrepare: false
+  hostedLegacyGroth16: false
+  # Fail closed: the owner hostedIntegration acceptanceToken is null while the
+  # joint acceptance seal is refreshed. Copy the owner-published sha256 token
+  # here verbatim once hostedIntegration.enabled is true; production rendering
+  # rejects anything that is not an exact sha256 token.
+  hostedIntegrationAcceptanceToken: "sha256:357c1ebdd407e84e5a239111b049ee25c1f33f5617d9f1fc53fd6c3d285418f0"
+
+global:
+  existingSecret: zkdeal-runtime-secrets
+  imagePullSecrets: []
+  podAnnotations: {}
+  labels: {}
+
+chain:
+  id: "31337"
+  rpcUrls: "http://l1.invalid:8545"
+  rpcProviderIds: "local-rpc-a"
+  roomManager: "0x0000000000000000000000000000000000000000"
+  roomPool: "0x0000000000000000000000000000000000000000"
+  accessToken: "0x0000000000000000000000000000000000000000"
+  beaconSidecarUrls: ""
+
+storage:
+  backend: filesystem
+  databaseSecretKey: database-url
+  apiKeyPepperSecretKey: api-key-pepper
+  objectStoreEndpointSecretKey: object-store-endpoint
+  objectStoreAccessKeySecretKey: object-store-access-key
+  objectStoreSecretKey: object-store-secret-key
+  objectStoreBucket: zkdeal
+  objectStoreRegion: us-east-1
+  objectStorePrefix: hosted
+  fencing: none
+
+availability:
+  mode: single-instance
+  rtoMinutes: 60
+  activeCoordinatorId: zkdeal-active-region
+  standbyCoordinatorId: zkdeal-standby-region
+
+externalServices:
+  openbaoAddress: ""
+  web3SignerAddress: ""
+  signerRoles:
+    liveness: { address: "", signerAddress: "", cidrs: [] }
+    operationsSettlement: { address: "", cidrs: [] }
+    payout: { address: "", cidrs: [] }
+    finalityOracle: { address: "", cidrs: [] }
+    sponsorRelayer: { address: "", cidrs: [] }
+    withdrawalRelayer: { address: "", signerAddress: "", cidrs: [] }
+    blobPublisher: { address: "", signerAddress: "", cidrs: [] }
+
+components:
+  coordinatorActive:
+    enabled: true
+    image: { repository: zkdeal-coordinator, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["node", "dist/index.js"]
+    workingDir: /app/web2-api/server
+    replicas: 1
+    port: 3000
+    healthPath: /hosting/v1/health
+    readinessPath: /hosting/v1/ready
+    role: active
+    runtimeIdentity: { uid: 10001, gid: 999 }
+    hostedRuntime: true
+    signerRole: operationsSettlement
+    injectChain: true
+    allowExternalEgress: true
+    env: {}
+    secretEnv: {}
+    persistence: { enabled: true, size: 10Gi, storageClass: "" }
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { cpu: "2", memory: 2Gi }
+  coordinatorStandby:
+    enabled: false
+    image: { repository: zkdeal-coordinator, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["node", "dist/index.js"]
+    workingDir: /app/web2-api/server
+    replicas: 1
+    port: 3000
+    healthPath: /hosting/v1/health
+    readinessPath: /hosting/v1/health
+    role: standby
+    runtimeIdentity: { uid: 10001, gid: 999 }
+    hostedRuntime: true
+    signerRole: ""
+    injectChain: true
+    allowExternalEgress: true
+    env: {}
+    secretEnv: {}
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { cpu: "1", memory: 1Gi }
+  queue:
+    enabled: true
+    image: { repository: zkdeal-coordinator, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["node", "dist/prove-queue/standalone.js"]
+    workingDir: /app/web2-api/server
+    replicas: 1
+    port: 3005
+    healthPath: /health
+    readinessPath: /health
+    role: queue
+    runtimeIdentity: { uid: 10001, gid: 999 }
+    injectChain: false
+    allowExternalEgress: false
+    env: { QUEUE_HOST: "0.0.0.0", QUEUE_PORT: "3005" }
+    secretEnv: { ZKDEAL_QUEUE_SUBMIT_TOKEN: queue-submit-token, ZKDEAL_QUEUE_NODE_TOKEN: queue-node-token }
+    persistence: { enabled: true, size: 50Gi, storageClass: "" }
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { cpu: "2", memory: 4Gi }
+  indexer:
+    enabled: false
+    image: { repository: zkdeal-coordinator, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["node", "dist/hosted-worker.js", "indexer"]
+    workingDir: /app/web2-api/server
+    replicas: 1
+    port: 3001
+    healthPath: /health
+    readinessPath: /ready
+    role: indexer
+    runtimeIdentity: { uid: 10001, gid: 999 }
+    hostedRuntime: true
+    signerRole: ""
+    injectChain: true
+    allowExternalEgress: true
+    env: { WORKER_PORT: "3001", HOSTED_WORKER_ROLE: indexer }
+    secretEnv: {}
+    persistence: { enabled: false, size: 10Gi, storageClass: "" }
+    resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { cpu: "2", memory: 2Gi } }
+  reconciler:
+    enabled: false
+    image: { repository: zkdeal-coordinator, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["node", "dist/hosted-worker.js", "reconciler"]
+    workingDir: /app/web2-api/server
+    replicas: 1
+    port: 3001
+    healthPath: /health
+    readinessPath: /ready
+    role: reconciler
+    runtimeIdentity: { uid: 10001, gid: 999 }
+    hostedRuntime: true
+    signerRole: ""
+    injectChain: true
+    allowExternalEgress: true
+    env: { WORKER_PORT: "3001", HOSTED_WORKER_ROLE: reconciler }
+    secretEnv: {}
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+    resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
+  publisher:
+    enabled: false
+    image: { repository: zkdeal-coordinator, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["node", "dist/hosted-publisher-worker.js"]
+    workingDir: /app/web2-api/server
+    replicas: 1
+    port: 3002
+    healthPath: /health
+    readinessPath: /ready
+    role: publisher
+    runtimeIdentity: { uid: 10001, gid: 999 }
+    hostedRuntime: true
+    signerRole: blobPublisher
+    injectChain: true
+    allowExternalEgress: true
+    env: { WORKER_PORT: "3002", BLOB_PUBLISHER_ENABLED: "1" }
+    secretEnv: { L1_SIGNER_AUTH_TOKEN: blob-publisher-auth-token }
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+    resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
+  headlessNode:
+    enabled: false
+    image: { repository: zkdeal-headless-room-node, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["node", "dist/cli.js", "run"]
+    workingDir: /app/app-node/packages/room-node
+    replicas: 1
+    port: 3100
+    healthPath: /health
+    readinessPath: /ready
+    role: headless
+    runtimeIdentity: { uid: 10001, gid: 10001 }
+    signerRole: ""
+    injectChain: false
+    allowExternalEgress: false
+    env: { ROOM_NODE_CONFIG_PATH: /run/zkdeal/room-node.json }
+    secretEnv: {}
+    roomNode:
+      configMapName: ""
+      secretName: ""
+      artifactClaimName: ""
+      configKey: room-node.json
+      keyFileKey: keys.json
+      controlTokenKey: control.token
+    persistence: { enabled: true, size: 50Gi, storageClass: "" }
+    resources: { requests: { cpu: 500m, memory: 1Gi }, limits: { cpu: "4", memory: 8Gi } }
+  prover:
+    enabled: false
+    image: { repository: zkdeal-risc0-cuda-runtime, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["serve", "--host", "0.0.0.0", "--port", "8080"]
+    workingDir: ""
+    replicas: 1
+    port: 8080
+    healthPath: /healthz
+    readinessPath: /healthz
+    role: prover
+    runtimeIdentity: { uid: 65532, gid: 65532 }
+    injectChain: false
+    allowExternalEgress: false
+    env: { RISC0_DEV_MODE: "0", RISC0_PROVER: local, RISC0_REQUIRE_CUDA: "1" }
+    secretEnv: { ZKDEAL_PROVER_TOKEN: prover-token }
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+    resources:
+      requests: { cpu: "2", memory: 8Gi, nvidia.com/gpu: "1" }
+      limits: { cpu: "16", memory: 64Gi, nvidia.com/gpu: "1" }
+  proverAgent:
+    enabled: false
+    image: { repository: zkdeal-prover-agent, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["node", "/app/agent/agent.js"]
+    workingDir: /app
+    replicas: 1
+    port: 9091
+    healthPath: /health
+    readinessPath: /health
+    livenessCommand: ["sh", "-ec", "kill -0 1"]
+    readinessCommand:
+      - node
+      - -e
+      - >-
+        (async()=>{const options={signal:AbortSignal.timeout(2500)};const auth={authorization:'Bearer '+process.env.NODE_LIVENESS_COORDINATOR_AUTH_TOKEN};const [queue,capabilities,prover]=await Promise.all([fetch(process.env.QUEUE_URL+'/hosting/v1/ready',options),fetch(process.env.NODE_LIVENESS_COORDINATOR_URL+'/hosting/v1/capabilities',{...options,headers:auth}),fetch(process.env.PROVER_URL+'/healthz',options)]);const body=await capabilities.json();if(!queue.ok||!capabilities.ok||!prover.ok||body?.managedL1Operations?.nodeHeartbeat?.enabledWhenConfigured!==true)process.exit(1)})().catch(()=>process.exit(1))
+    role: prover-agent
+    runtimeIdentity: { uid: 10001, gid: 10001 }
+    injectChain: false
+    allowExternalEgress: false
+    signerRole: ""
+    env:
+      QUEUE_URL: "http://zkdeal-coordinator-active:3000"
+      NODE_LIVENESS_COORDINATOR_URL: "http://zkdeal-coordinator-active:3000"
+      NODE_ID: local-gpu-node-0
+      NODE_LIVENESS_ACCOUNT: "0x1111111111111111111111111111111111111111"
+      PROVER_URL: "http://zkdeal-prover:8080"
+      ZKDEAL_AGENT_GPU: "1"
+    secretEnv:
+      ZKDEAL_QUEUE_NODE_TOKEN: queue-node-token
+      ZKDEAL_PROVER_TOKEN: prover-token
+      NODE_LIVENESS_COORDINATOR_AUTH_TOKEN: node-liveness-coordinator-auth-token
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+    resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
+  # Deliberate hosting-service topology (no placeholder Deployments):
+  # - Tenant and entitlement APIs are coordinator routes
+  #   (/hosting/v1/tenants, /hosting/v1/principals, /hosting/v1/entitlements)
+  #   served by coordinatorActive with scoped principal auth. There is no
+  #   separate tenant-api service.
+  # - Sponsorship registration/budget APIs are coordinator routes
+  #   (/hosting/v1/sponsorships); the on-chain sponsor mutation is the owner
+  #   managed L1 operation executed inside the coordinator plane with the
+  #   scoped sponsorRelayer signer role, not a generic sidecar service.
+  # - Finalized-checkpoint recording is the owner managed finalized-checkpoint
+  #   L1 operation registered on the coordinator with the scoped finalityOracle
+  #   signer role.
+  # - Provider payout has no owner-published runnable worker yet; no service
+  #   slot exists until the owner ships one. The payout signer role stays
+  #   declared in externalServices for post-fence signer-authority routing.
+  # The retired hosting-services placeholder image must never return;
+  # templates/validate.yaml rejects it for every profile.
+  capacityController:
+    enabled: false
+    image: { repository: zkdeal-coordinator, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["node", "dist/hosted-capacity-worker.js", "run"]
+    workingDir: /app/web2-api/server
+    replicas: 1
+    port: 3004
+    healthPath: /health
+    readinessPath: /ready
+    role: capacity-controller
+    runtimeIdentity: { uid: 10001, gid: 999 }
+    hostedRuntime: true
+    signerRole: ""
+    injectChain: true
+    allowExternalEgress: true
+    env: { WORKER_PORT: "3004", HOSTED_WORKER_INTERVAL_MS: "3000", CAPACITY_CONTROLLER_ENABLED: "1", CAPACITY_PROVIDER_URL: "https://capacity-provider.local.invalid/v1", CAPACITY_LEASE_TTL_MS: "30000", CAPACITY_BATCH_SIZE: "20" }
+    secretEnv: { CAPACITY_PROVIDER_AUTH_TOKEN: capacity-provider-auth-token }
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+    resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
+  autoClaimer:
+    enabled: false
+    image: { repository: zkdeal-coordinator, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: ["node", "dist/hosted-withdrawal-worker.js", "run"]
+    workingDir: /app/web2-api/server
+    replicas: 1
+    port: 3003
+    healthPath: /health
+    readinessPath: /ready
+    role: auto-claimer
+    runtimeIdentity: { uid: 10001, gid: 999 }
+    hostedRuntime: true
+    signerRole: withdrawalRelayer
+    injectChain: true
+    allowExternalEgress: true
+    env: { WORKER_PORT: "3003", HOSTED_WORKER_INTERVAL_MS: "3000", WITHDRAWAL_CLAIMER_ENABLED: "1", WITHDRAWAL_CLAIM_GAS_LIMIT: "500000", WITHDRAWAL_CLAIM_INCLUSION_WINDOW_BLOCKS: "64" }
+    secretEnv: { WITHDRAWAL_SIGNER_AUTH_TOKEN: withdrawal-signer-auth-token }
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+    resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
+  docs:
+    enabled: true
+    image: { repository: zkdeal-operator-docs, tag: local, digest: "", pullPolicy: IfNotPresent }
+    command: []
+    workingDir: ""
+    replicas: 1
+    port: 8080
+    healthPath: /
+    readinessPath: /
+    role: docs
+    runtimeIdentity: { uid: 101, gid: 101 }
+    injectChain: false
+    allowExternalEgress: false
+    env: {}
+    secretEnv: {}
+    persistence: { enabled: false, size: 1Gi, storageClass: "" }
+    resources: { requests: { cpu: 25m, memory: 32Mi }, limits: { cpu: 250m, memory: 128Mi } }
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+ingress:
+  enabled: false
+  className: ""
+  host: zkdeal.invalid.example
+  annotations: {}
+  tls:
+    enabled: false
+    secretName: ""
+
+networkPolicy:
+  enabled: true
+  ingressNamespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } }
+  ingressPodSelector: { matchLabels: { app.kubernetes.io/component: controller } }
+  monitoringNamespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } }
+  monitoringPodSelector: { matchLabels: { app.kubernetes.io/name: prometheus } }
+  dnsNamespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+  dnsPodSelector: { matchLabels: { k8s-app: kube-dns } }
+  externalEgressCidrs: []
+  externalEgressPorts: [443]
+  internalFlows:
+    - { from: proverAgent, to: coordinatorActive, port: 3000 }
+    - { from: proverAgent, to: prover, port: 8080 }
+    - { from: indexer, to: coordinatorActive, port: 3000 }
+    - { from: reconciler, to: coordinatorActive, port: 3000 }
+    - { from: publisher, to: coordinatorActive, port: 3000 }
+    - { from: headlessNode, to: coordinatorActive, port: 3000 }
+    - { from: capacityController, to: coordinatorActive, port: 3000 }
+    - { from: autoClaimer, to: coordinatorActive, port: 3000 }
+  operationalFlows:
+    backup: { cidrs: [], ports: [443, 5432] }
+    restore: { cidrs: [], ports: [443, 5432] }
+    migration: { cidrs: [], ports: [5432] }
+    promotion: { cidrs: [], ports: [5432] }
+    failoverProvider: { cidrs: [], ports: [443] }
+    signerAuthority: { cidrs: [], ports: [9000] }
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+monitoring:
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+  prometheusRule:
+    enabled: false
+
+autoscaling:
+  enabled: false
+  components:
+    # Tenant/entitlement traffic is coordinator-served; the coordinator is a
+    # fenced Recreate writer and must not autoscale, so no tenant-api policy
+    # exists here.
+    # zkdeal_rooms_waiting_for_node is a required-owner-contract series in
+    # observability/metric-catalog.json; the HPA cannot scale past minReplicas
+    # until the coordinator publishes it.
+    headlessNode: { minReplicas: 1, maxReplicas: 20, metricName: zkdeal_rooms_waiting_for_node, targetAverageValue: "1" }
+    proverAgent: { minReplicas: 1, maxReplicas: 20, metricName: zkdeal_queue_oldest_waiting_age_seconds, targetAverageValue: "60" }
+
+operations:
+  backup:
+    enabled: false
+    schedule: "17 */6 * * *"
+    image: { repository: zkdeal-backup-tools, tag: local, digest: "", pullPolicy: IfNotPresent }
+    sourceBucket: zkdeal
+    sourcePrefix: live
+    backupBucket: zkdeal-backups
+    backupPrefix: hosted
+    targetObjectStoreEndpointSecretKey: backup-object-store-endpoint
+    targetObjectStoreAccessKeySecretKey: backup-object-store-access-key
+    targetObjectStoreSecretKey: backup-object-store-secret-key
+    encryptionKeySecretKey: backup-encryption-key
+    retentionDays: 365
+    workSize: 100Gi
+    activeDeadlineSeconds: 7200
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { cpu: "2", memory: 2Gi } }
+  restore:
+    enabled: false
+    restoreId: ""
+    confirm: ""
+    image: { repository: zkdeal-backup-tools, tag: local, digest: "", pullPolicy: IfNotPresent }
+    backupBucket: zkdeal-backups
+    backupPrefix: hosted
+    targetBucket: zkdeal-restored
+    targetPrefix: live
+    backupObjectStoreEndpointSecretKey: backup-object-store-endpoint
+    backupObjectStoreAccessKeySecretKey: backup-object-store-access-key
+    backupObjectStoreSecretKey: backup-object-store-secret-key
+    targetObjectStoreEndpointSecretKey: restore-object-store-endpoint
+    targetObjectStoreAccessKeySecretKey: restore-object-store-access-key
+    targetObjectStoreSecretKey: restore-object-store-secret-key
+    targetDatabaseSecretKey: restore-database-url
+    encryptionKeySecretKey: backup-encryption-key
+    workSize: 100Gi
+    activeDeadlineSeconds: 7200
+    resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { cpu: "2", memory: 2Gi } }
+  promotion:
+    enabled: false
+    manualJobEnabled: false
+    endpoint: ""
+    requiredReplayLsn: ""
+    databaseUrlSecretKey: promotion-database-url
+    idempotencyKeySecretKey: promotion-idempotency-key
+    principalTokenSecretKey: promotion-principal-token
+    activeDeadlineSeconds: 240
+    image: { repository: postgres, tag: 17.6-alpine, digest: "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94", pullPolicy: IfNotPresent }
+    controller:
+      enabled: false
+      armed: false
+      image: { repository: zkdeal-promotion-controller, tag: local, digest: "", pullPolicy: IfNotPresent }
+      activeHealthUrls: []
+      standbyHealthUrl: ""
+      failoverProviderUrl: ""
+      candidateId: ""
+      failureThreshold: 3
+      pollSeconds: 10
+      maxRtoSeconds: 300
+      maxCheckpointAgeSeconds: 30
+      requestTimeoutSeconds: 10
+      providerTokenSecretKey: failover-provider-token
+      approvalTokenSecretKey: failover-approval-token
+      principalTokenSecretKey: promotion-principal-token
+      resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { cpu: 500m, memory: 256Mi } }
+    provider:
+      enabled: false
+      platform: kubernetes
+      image: { repository: zkdeal-failover-provider, tag: local, digest: "", pullPolicy: IfNotPresent }
+      servicePort: 8443
+      activeHealthUrls: []
+      standbyHealthUrl: ""
+      indexerFreshnessUrl: ""
+      stateClaimName: ""
+      tlsSecretName: ""
+      tlsCertKey: tls.crt
+      tlsPrivateKey: tls.key
+      providerTokenSecretKey: failover-provider-token
+      approvalTokenSecretKey: failover-approval-token
+      platformTimeoutSeconds: 120
+      requestTimeoutSeconds: 10
+      primaryDatabaseStatefulSet: ""
+      primaryDatabasePod: ""
+      standbyDatabasePod: ""
+      postgresContainer: postgres
+      databaseService: ""
+      applicationService: ""
+      signerAuthorityDeployment: ""
+      routeScopeLabelKey: app.kubernetes.io/instance
+      routeScopeLabelValue: ""
+      routeLabelKey: zkdeal.io/failover-target
+      standbyRouteValue: standby
+      pgUser: zkdeal
+      pgDatabase: zkdeal
+      pgData: /var/lib/postgresql/data
+      resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: "1", memory: 512Mi } }
+      signerAuthority:
+        enabled: false
+        image: { repository: nginx, tag: 1.27-alpine, digest: "sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10", pullPolicy: IfNotPresent }
+        resources: { requests: { cpu: 25m, memory: 32Mi }, limits: { cpu: 250m, memory: 128Mi } }
+
+migration:
+  enabled: false
+  image: { repository: zkdeal-coordinator, tag: local, digest: "", pullPolicy: IfNotPresent }
+  command: []

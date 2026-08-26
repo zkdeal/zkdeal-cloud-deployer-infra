@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "service": "zkdeal-owner-acceptance-runner",
+  "entrypoint": "/opt/zkdeal-acceptance",
+  "planSchema": "/opt/zkdeal/scenario-plan.schema.json",
+  "candidatePreflight": {
+    "endpoint": "/hosting/v1/capabilities",
+    "requiresExactDatabaseSchema": true,
+    "requiresRoomBatchEnabled": true,
+    "requiresHostedIntegrationEnabled": true,
+    "requiresExactHostedIntegrationToken": true,
+    "requiresRoomAggregateEnabled": true,
+    "requiresPoolSponsorMutationEnabled": true
+  },
+  "credentials": {
+    "transport": "role-specific-mounted-files",
+    "planHashBound": true,
+    "enclaveScopedOnly": true,
+    "independentlyRevocable": true,
+    "serializedInEvidence": false,
+    "scopedEndpointAuthorities": {
+      "fault": "fault_control",
+      "backup": "backup_restore",
+      "failoverBearer": "failover_control",
+      "failoverMutationApproval": "failover_approval"
+    }
+  },
+  "scenarios": {
+    "reorg": ["--assert-rollback-and-retraction"],
+    "rpc-disagreement": ["--assert-fail-closed"],
+    "split-brain-promotion": ["--kill-active", "--assert-fence", "--assert-rto-seconds", "300"],
+    "database-object-restore": ["--fresh-database", "--fresh-object-store", "--assert-hashes"],
+    "sponsorship": ["--assert-tenant-isolation", "--assert-idempotency"],
+    "queue-congestion": ["--assert-fairness", "--assert-backoff"],
+    "headless-restart": ["--assert-state-continuity", "--assert-single-writer"],
+    "blob": ["--assert-hash-binding", "--assert-restart-resume"],
+    "partial-aggregate": ["--assert-member-outcomes"],
+    "renewal": ["--assert-deadline-and-metering"],
+    "withdrawal": ["--assert-finality", "--assert-replay-denial"],
+    "rpc-load-shadow": ["--assert-latency-budget-ms", "500", "--assert-mismatch-rate", "0"],
+    "sse-load-shadow": ["--assert-reconnect", "--assert-backpressure", "--assert-subscriber-cap"],
+    "indexer-load-shadow": ["--assert-rollback", "--assert-lag-budget-blocks", "8"],
+    "admission-load-shadow": ["--assert-wal-durable", "--assert-backpressure", "--assert-cap"],
+    "scheduler-load-shadow": ["--assert-mixed-tenant-fairness", "--assert-deadline-budget"],
+    "projection-parity-shadow": ["--assert-projection-parity", "--assert-mismatch-rate", "0"],
+    "prover-agent-trace-join": ["--assert-coordinator-agent-prover-heartbeat"]
+  },
+  "evidence": {
+    "writeOnce": true,
+    "oneArtifactPerScenario": true,
+    "requestAndResponseHashes": true,
+    "endpointBindingsSha256": true,
+    "sourceSeparated": true,
+    "fixtureRunsAreReleaseEvidence": false
+  }
+}

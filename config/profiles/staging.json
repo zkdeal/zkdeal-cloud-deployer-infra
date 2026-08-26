@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "name": "staging",
+  "environment": "staging",
+  "publicExposure": false,
+  "chain": {
+    "id": 11155111,
+    "rpcUrls": ["https://rpc-a.invalid.example", "https://rpc-b.invalid.example"],
+    "contracts": {
+      "roomManager": "0x0000000000000000000000000000000000000000",
+      "roomPool": "0x0000000000000000000000000000000000000000",
+      "accessToken": "0x0000000000000000000000000000000000000000"
+    },
+    "maximumArchiveLagBlocks": 8
+  },
+  "services": {
+    "coordinator": { "enabled": true, "replicas": 1, "port": 3000, "healthPath": "/health" },
+    "queue": { "enabled": true, "replicas": 1, "port": 3005, "healthPath": "/health" },
+    "prover": { "enabled": true, "replicas": 1, "port": 8080, "healthPath": "/healthz" },
+    "agent": { "enabled": true, "replicas": 1, "port": 9091, "healthPath": "/health" },
+    "docs": { "enabled": true, "replicas": 1, "port": 8080, "healthPath": "/" }
+  },
+  "storage": {
+    "backend": "filesystem",
+    "dataRoot": ".state/staging",
+    "backupRoot": ".state/staging/backups",
+    "retentionDays": 30,
+    "hotRetentionDays": 30,
+    "archiveRetentionDays": 90
+  },
+  "availability": {
+    "mode": "single-region",
+    "fencing": "none",
+    "rpoMinutes": 60,
+    "rtoMinutes": 30,
+    "multiRegion": false,
+    "warmStandbyReplicas": 0
+  },
+  "security": {
+    "tlsMode": "external",
+    "trustedProxyCidrs": ["10.0.0.0/8"],
+    "corsOrigins": ["https://staging.invalid.example"],
+    "secretSource": "kubernetes-secret",
+    "existingSecret": "zkdeal-staging-secrets"
+  },
+  "observability": {
+    "enabled": true,
+    "scrapeIntervalSeconds": 15,
+    "alertsEnabled": true,
+    "externalLabels": { "environment": "staging" }
+  },
+  "images": {
+    "manifest": "config/images.lock.json",
+    "overrides": null,
+    "allowTagOverrides": false
+  }
+}

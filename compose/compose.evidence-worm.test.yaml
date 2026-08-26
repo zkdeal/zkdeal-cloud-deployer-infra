@@ -1,0 +1,27 @@
+name: zkdeal-evidence-worm-acceptance
+
+services:
+  evidence-minio:
+    image: minio/minio@sha256:a1ea29fa28355559ef137d71fc570e508a214ec84ff8083e39bc5428980b015e
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: evidence-worm-admin
+      MINIO_ROOT_PASSWORD: evidence-worm-acceptance-password
+    volumes:
+      - evidence-worm-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    networks: [worm]
+
+volumes:
+  evidence-worm-data: {}
+
+networks:
+  worm:
+    internal: true
