@@ -30,6 +30,40 @@ storage and transactional epoch fencing:
 - production validation rejects unpinned images, inline secrets, missing TLS,
   single-RPC critical paths, and multi-replica filesystem authority.
 
+## Motivational example
+
+Suppose the application works on one laptop. The next problem is not “start
+more containers”; it is keeping image provenance, service identities, storage
+authority, and signer boundaries intact while the topology changes. This
+repository packages those operational choices.
+
+The public walkthrough establishes the runtime baseline this project is meant
+to deploy: local Ethereum, room execution, a native CUDA prover, the
+coordinator, Blockscout, and a prebuilt shop all become ready in one Kurtosis
+enclave. It runs the sibling public acceptance package, not this repository's
+hosted overlay or production gate; those remain separate, stricter claims.
+
+[![A terminal reports READY for every service in the zkdeal B200 Kurtosis enclave and exposes the prebuilt shop.](https://zkdeal.org/blog/terminal/vi-profile-and-fallback-checks-poster.png?v=52a883fd8214)](https://zkdeal.org/blog/specialized-validity-systems-and-stage-aligned-room-profiles/#terminal-recording)
+
+**Watch or inspect the run:** [interactive Asciinema recording](https://zkdeal.org/blog/specialized-validity-systems-and-stage-aligned-room-profiles/#terminal-recording) · [copyable transcript](https://zkdeal.org/blog/terminal/vi-profile-and-fallback-checks.txt) · [Asciicast v3](https://zkdeal.org/blog/terminal/vi-profile-and-fallback-checks.cast) · [VHS tape](https://zkdeal.org/blog/terminal/vi-profile-and-fallback-checks.tape) · [WebM](https://zkdeal.org/blog/terminal/vi-profile-and-fallback-checks.webm) · [MP4](https://zkdeal.org/blog/terminal/vi-profile-and-fallback-checks.mp4)
+
+Once the tutorial enclave is running, one read reports the coordinator's view;
+`jq` then fails unless every advertised dependency is ready:
+
+```sh
+curl -fsS http://127.0.0.1:3100/demo/v1/system | jq -e -c \
+  '{decision,allServicesReady:([.services[].status]|all(.=="READY")),gpu:.gpu.name,explorerPublished:(.canary.explorerUrl!=null),explorerUrl} | \
+  select(.decision=="READY" and .allServicesReady and .gpu=="NVIDIA B200" and .explorerPublished)'
+```
+
+Expected result:
+
+```text
+{"decision":"READY","allServicesReady":true,"gpu":"NVIDIA B200","explorerPublished":true,"explorerUrl":"http://127.0.0.1:3200"}
+```
+
+[Run the complete full-stack tutorial](https://zkdeal.org/blog/specialized-validity-systems-and-stage-aligned-room-profiles/) or continue with this repository's [operator-owned Kurtosis packages](kurtosis/README.md).
+
 ## Quick start
 
 From `cloud-deployer-infra`:
