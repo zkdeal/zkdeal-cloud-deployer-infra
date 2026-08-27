@@ -7,9 +7,11 @@
   },
   "images": {
     "coordinator": {
-      "repository": "zkdeal-coordinator",
-      "digest": null,
-      "status": "owner-build-required",
+      "repository": "docker.io/zkdeal/coordinator",
+      "tag": "20260827-shopfinal-faa4149",
+      "digest": "sha256:fd6a3f687b2b09e3df1336f0318804b339d12fa9d53e0a5ed9d6796bd047ec05",
+      "reference": "docker.io/zkdeal/coordinator:20260827-shopfinal-faa4149@sha256:fd6a3f687b2b09e3df1336f0318804b339d12fa9d53e0a5ed9d6796bd047ec05",
+      "status": "Docker Hub tag/digest verified 2026-08-27; recommended public Kurtosis coordinator and runner image; candidate-specific production acceptance remains required",
       "ownerArtifact": "coordinator-dockerfile",
       "requiredInProduction": true
     },
@@ -70,9 +72,39 @@
       "requiredInProduction": true
     },
     "prover": {
-      "repository": "zkdeal-risc0-cuda-runtime",
-      "digest": null,
-      "status": "physical-gpu-release-required",
+      "repository": "docker.io/zkdeal/prover-cuda",
+      "tag": "sm100-d60547b-20260827",
+      "digest": "sha256:e1a0b4b36637a415823fdcf1139657884dfa1f1016441a8d1e3701bed4483d67",
+      "reference": "docker.io/zkdeal/prover-cuda:sm100-d60547b-20260827@sha256:e1a0b4b36637a415823fdcf1139657884dfa1f1016441a8d1e3701bed4483d67",
+      "architecture": "sm100",
+      "status": "Docker Hub tag/digest verified 2026-08-27; recommended B200 public Kurtosis image; CUDA-only service and clean public-layout acceptance exercised on B200; this is source-bound acceptance, not a general hardware-support claim",
+      "publishedArchitectureVariants": {
+        "sm86": {
+          "tag": "sm86-d60547b-20260827",
+          "digest": "sha256:d6fb137376c365fe3c881fbe89cd1a7111e2309f278a54144d0502cd6eea50e7",
+          "validation": "Docker Hub digest verified; native sm_86 cubins build-inspected"
+        },
+        "sm89": {
+          "tag": "sm89-d60547b-20260827",
+          "digest": "sha256:910afc1e2fb078ac8b4f11f64bdf7aa3d8b1f4b8cadf8a142b7b9e66bde08006",
+          "validation": "Docker Hub digest verified; native sm_89 cubins build-inspected; latest currently resolves here"
+        },
+        "sm90": {
+          "tag": "sm90-d60547b-20260827",
+          "digest": "sha256:35043aa6408292420695812a64bd2aa0f9e180019d78ce2b5cd7caedaaf8dd84",
+          "validation": "Docker Hub digest verified; native sm_90 cubins build-inspected"
+        },
+        "sm100": {
+          "tag": "sm100-d60547b-20260827",
+          "digest": "sha256:e1a0b4b36637a415823fdcf1139657884dfa1f1016441a8d1e3701bed4483d67",
+          "validation": "Docker Hub digest verified; native sm_100 cubins and CUDA-only service exercised on B200"
+        },
+        "sm120": {
+          "tag": "sm120-d60547b-20260827",
+          "digest": "sha256:16f8849f1db554c97c9571d5c43e399a24c61b239f728b70bec93fa29d7f799d",
+          "validation": "Docker Hub digest verified; native sm_120 cubins build-inspected"
+        }
+      },
       "ownerArtifact": "zkvm-trust-root",
       "requiredInProduction": true
     },
