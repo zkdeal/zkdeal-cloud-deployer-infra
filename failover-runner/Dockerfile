@@ -4,7 +4,7 @@ COPY failover-runner/zkdeal_failover.py /opt/zkdeal/zkdeal_failover.py
 COPY scripts/promotion_controller.py /opt/zkdeal/promotion_controller.py
 COPY acceptance-runner/zkdeal_acceptance.py /opt/zkdeal-acceptance
 COPY promotion-controller/failover-provider-v1.openapi.json /opt/zkdeal/failover-provider-v1.openapi.json
-COPY zkdeal-BUSL-1.1-LICENSE /zkdeal-BUSL-1.1-LICENSE
+COPY LICENSE /LICENSE
 
 ARG FAILOVER_RUNNER_SOURCE_SHA256
 RUN test -n "$FAILOVER_RUNNER_SOURCE_SHA256" \
@@ -21,7 +21,7 @@ RUN test -n "$FAILOVER_RUNNER_SOURCE_SHA256" \
 LABEL org.opencontainers.image.title="zkdeal-failover-runner" \
       org.opencontainers.image.description="Provider-backed promotion and stale-writer assertion runner" \
       org.zkdeal.failover-runner.source.sha256="$FAILOVER_RUNNER_SOURCE_SHA256" \
-      org.opencontainers.image.licenses="BUSL-1.1"
+      org.opencontainers.image.licenses="MIT"
 
 USER 65532:65532
 WORKDIR /work

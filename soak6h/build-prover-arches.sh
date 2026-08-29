@@ -24,9 +24,9 @@ for ARCH in 86 89 90; do
   echo "PASS runtime sm${ARCH}"
 
   # licence contract check (same as every other published image)
-  lic=$(docker run --rm --entrypoint "" zkdeal/prover-cuda:sm${ARCH}-${TAG} sh -c 'head -c 27 /zkdeal-BUSL-1.1-LICENSE' 2>/dev/null)
+  lic=$(docker run --rm --entrypoint "" zkdeal/prover-cuda:sm${ARCH}-${TAG} sh -c 'head -c 11 /LICENSE' 2>/dev/null)
   lbl=$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.licenses"}}' zkdeal/prover-cuda:sm${ARCH}-${TAG} 2>/dev/null)
-  [ "$lic" = "Business Source License 1.1" ] && [ "$lbl" = "BUSL-1.1" ] \
+  [ "$lic" = "MIT License" ] && [ "$lbl" = "MIT" ] \
     && echo "PASS licence sm${ARCH}" || echo "FAIL licence sm${ARCH} ('$lic' / '$lbl')"
 
   docker tag zkdeal/prover-cuda:sm${ARCH}-${TAG} zkdeal/prover-cuda:sm${ARCH}

@@ -1,7 +1,7 @@
 FROM python:3.13-alpine@sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d
 
 COPY fault-control/fault_control.py /opt/zkdeal/fault_control.py
-COPY zkdeal-BUSL-1.1-LICENSE /zkdeal-BUSL-1.1-LICENSE
+COPY LICENSE /LICENSE
 
 ARG FAULT_CONTROL_SOURCE_SHA256
 RUN test -n "$FAULT_CONTROL_SOURCE_SHA256" \
@@ -13,7 +13,7 @@ RUN test -n "$FAULT_CONTROL_SOURCE_SHA256" \
 LABEL org.opencontainers.image.title="zkdeal-fault-control" \
       org.opencontainers.image.description="Candidate-bound allowlisted fault and load controller" \
       org.zkdeal.fault-control.source.sha256="$FAULT_CONTROL_SOURCE_SHA256" \
-      org.opencontainers.image.licenses="BUSL-1.1"
+      org.opencontainers.image.licenses="MIT"
 
 USER 65532:65532
 WORKDIR /work

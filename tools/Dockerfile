@@ -13,7 +13,7 @@ COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/
 COPY --from=minio-client /usr/bin/mc /usr/local/bin/mc
 COPY --from=helm-client /usr/bin/helm /usr/local/bin/helm
 COPY tools/requirements.lock /tmp/requirements.lock
-COPY zkdeal-BUSL-1.1-LICENSE /zkdeal-BUSL-1.1-LICENSE
+COPY LICENSE /LICENSE
 
 RUN wget -q -O /usr/local/bin/kind https://github.com/kubernetes-sigs/kind/releases/download/v0.27.0/kind-linux-amd64 \
  && echo "a6875aaea358acf0ac07786b1a6755d08fd640f4c79b7a2e46681cc13f49a04b  /usr/local/bin/kind" | sha256sum -c - \
@@ -27,7 +27,7 @@ RUN wget -q -O /usr/local/bin/kind https://github.com/kubernetes-sigs/kind/relea
  && pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock \
  && rm -f /tmp/requirements.lock
 
-LABEL org.opencontainers.image.licenses="BUSL-1.1"
+LABEL org.opencontainers.image.licenses="MIT"
 
 WORKDIR /workspace/cloud-deployer-infra
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1

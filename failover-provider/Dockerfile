@@ -9,7 +9,7 @@ RUN wget -q -O /usr/local/bin/kubectl https://dl.k8s.io/release/v1.32.2/bin/linu
 
 COPY failover-provider/provider.py /opt/zkdeal/provider.py
 COPY promotion-controller/failover-provider-v1.openapi.json /opt/zkdeal/failover-provider-v1.openapi.json
-COPY zkdeal-BUSL-1.1-LICENSE /zkdeal-BUSL-1.1-LICENSE
+COPY LICENSE /LICENSE
 
 RUN addgroup -S -g 65532 zkdeal \
  && adduser -S -D -H -u 65532 -G zkdeal zkdeal \
@@ -20,7 +20,7 @@ RUN addgroup -S -g 65532 zkdeal \
  && chmod 0555 /opt/zkdeal/provider.py \
  && chmod 0444 /opt/zkdeal/failover-provider-v1.openapi.json
 
-LABEL org.opencontainers.image.licenses="BUSL-1.1"
+LABEL org.opencontainers.image.licenses="MIT"
 
 USER 65532:65532
 EXPOSE 8443

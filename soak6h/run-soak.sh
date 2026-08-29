@@ -142,7 +142,7 @@ preflight_tree() {
   need_cmd python3
   [ -d "$ZKDEAL_ROOT" ] || die "umbrella tree is absent: $ZKDEAL_ROOT (set ZKDEAL_ROOT)" "tree"
   [ -d "$INFRA" ] || die "cloud-deployer-infra is absent: $INFRA" "tree"
-  [ -f "$ZKDEAL_ROOT/zkdeal-BUSL-1.1-LICENSE" ] || die "umbrella root license is absent; the owner-soak-driver build context needs it" "tree"
+  [ -f "$ZKDEAL_ROOT/LICENSE" ] || die "umbrella root license is absent; the owner-soak-driver build context needs it" "tree"
   [ -f "$INFRA/owner-soak-driver/zkdeal_owner_soak.py" ] || die "owner driver source is absent: $INFRA/owner-soak-driver/zkdeal_owner_soak.py" "tree"
   [ -f "$INFRA/owner-soak-driver/Dockerfile" ] || die "owner driver Dockerfile is absent" "tree"
   [ -f "$INFRA/soak-runner/Dockerfile" ] || die "soak-runner Dockerfile is absent" "tree"
@@ -362,7 +362,7 @@ build_owner_driver() {
     rm -rf "$context"
     mkdir -p "$context/cloud-deployer-infra/owner-soak-driver"
     cp "$INFRA/owner-soak-driver/zkdeal_owner_soak.py" "$context/cloud-deployer-infra/owner-soak-driver/zkdeal_owner_soak.py"
-    cp "$ZKDEAL_ROOT/zkdeal-BUSL-1.1-LICENSE" "$context/zkdeal-BUSL-1.1-LICENSE"
+    cp "$ZKDEAL_ROOT/LICENSE" "$context/LICENSE"
     log "using the staged minimal build context $context"
   fi
 

@@ -7,7 +7,7 @@ COPY docs/*.md /usr/share/nginx/html/guides/
 COPY docs/schemas /usr/share/nginx/html/schemas
 COPY observability/metric-catalog.json /usr/share/nginx/html/reference/metric-catalog.json
 COPY runbooks /usr/share/nginx/html/runbooks
-COPY zkdeal-BUSL-1.1-LICENSE /zkdeal-BUSL-1.1-LICENSE
-LABEL org.opencontainers.image.licenses="BUSL-1.1"
+COPY LICENSE /LICENSE
+LABEL org.opencontainers.image.licenses="MIT"
 USER 101:101
 EXPOSE 8080

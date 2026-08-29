@@ -11,7 +11,7 @@ COPY soak-runner/zkdeal_soak.py /opt/zkdeal/zkdeal_soak.py
 COPY scripts/common.py /opt/zkdeal/common.py
 COPY scripts/soak.py /opt/zkdeal/soak.py
 COPY config/schemas/release-soak-manifest.schema.json /opt/zkdeal/release-soak-manifest.schema.json
-COPY zkdeal-BUSL-1.1-LICENSE /zkdeal-BUSL-1.1-LICENSE
+COPY LICENSE /LICENSE
 
 ARG SOAK_RUNNER_SOURCE_SHA256
 RUN test -n "$SOAK_RUNNER_SOURCE_SHA256" \
@@ -28,7 +28,7 @@ RUN test -n "$SOAK_RUNNER_SOURCE_SHA256" \
 LABEL org.opencontainers.image.title="zkdeal-soak-runner" \
       org.opencontainers.image.description="Restart-safe owner lifecycle soak orchestrator and closure verifier" \
       org.zkdeal.soak-runner.source.sha256="$SOAK_RUNNER_SOURCE_SHA256" \
-      org.opencontainers.image.licenses="BUSL-1.1"
+      org.opencontainers.image.licenses="MIT"
 
 USER 65532:65532
 WORKDIR /work

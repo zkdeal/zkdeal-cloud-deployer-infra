@@ -7,7 +7,7 @@ RUN apk add --no-cache python3 py3-cryptography
 
 COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 COPY backup-restore-control/backup_restore_control.py /opt/zkdeal/backup_restore_control.py
-COPY zkdeal-BUSL-1.1-LICENSE /zkdeal-BUSL-1.1-LICENSE
+COPY LICENSE /LICENSE
 
 ARG BACKUP_RESTORE_CONTROL_SOURCE_SHA256
 RUN test -n "$BACKUP_RESTORE_CONTROL_SOURCE_SHA256" \
@@ -20,7 +20,7 @@ RUN test -n "$BACKUP_RESTORE_CONTROL_SOURCE_SHA256" \
 LABEL org.opencontainers.image.title="zkdeal-backup-restore-control" \
       org.opencontainers.image.description="Candidate-bound PostgreSQL and MinIO backup/restore controller" \
       org.zkdeal.backup-restore-control.source.sha256="$BACKUP_RESTORE_CONTROL_SOURCE_SHA256" \
-      org.opencontainers.image.licenses="BUSL-1.1"
+      org.opencontainers.image.licenses="MIT"
 
 USER 65532:65532
 WORKDIR /work

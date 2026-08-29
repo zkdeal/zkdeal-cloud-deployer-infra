@@ -42,12 +42,12 @@ LABEL org.opencontainers.image.title="zkdeal-prover-agent" \
       org.zkdeal.owner.source.sha256="$AGENT_SOURCE_SHA256" \
       org.zkdeal.owner.liveness-capability.sha256="$AGENT_CAPABILITY_SHA256" \
       org.zkdeal.owner.trace-capability.sha256="$AGENT_TRACE_CAPABILITY_SHA256" \
-      org.opencontainers.image.licenses="BUSL-1.1"
+      org.opencontainers.image.licenses="MIT"
 WORKDIR /app
 COPY --from=build /runtime/agent ./agent
 COPY --from=build /source/prover-node/agent/liveness-capability.json ./capabilities/liveness-capability.json
 COPY --from=build /source/prover-node/agent/trace-capability.json ./capabilities/trace-capability.json
-COPY zkdeal-BUSL-1.1-LICENSE /zkdeal-BUSL-1.1-LICENSE
+COPY LICENSE /LICENSE
 RUN groupadd --gid 10001 zkdeal-agent \
  && useradd --system --no-create-home --uid 10001 --gid 10001 zkdeal-agent \
  && chown -R 10001:10001 /app
