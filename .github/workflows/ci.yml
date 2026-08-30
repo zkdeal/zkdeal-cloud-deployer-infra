@@ -17,10 +17,15 @@ jobs:
     name: Deployment conformance
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: cloud-deployer-infra
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          path: cloud-deployer-infra
 
       - name: Validate tools Compose configuration
         run: docker compose -f compose/compose.tools.yaml config --quiet
