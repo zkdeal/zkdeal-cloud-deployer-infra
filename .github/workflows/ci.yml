@@ -34,11 +34,12 @@ jobs:
         run: docker compose -f compose/compose.tools.yaml build deployment-tools
 
       - name: Prepare writable test workspace
-        run: install -d -m 0777 .test-tmp
+        run: install -d .state .test-tmp
 
       - name: Run standalone deployment conformance tests
         run: |
-          docker compose -f compose/compose.tools.yaml run --rm deployment-tools \
+          docker compose -f compose/compose.tools.yaml run --rm \
+            --user "$(id -u):$(id -g)" deployment-tools \
             -m unittest -v \
             tests.test_candidate_topology \
             tests.test_compose_security \
