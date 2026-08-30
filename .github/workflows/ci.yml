@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deployment-conformance:
+    name: Deployment conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate tools Compose configuration
+        run: docker compose -f compose/compose.tools.yaml config --quiet
+
+      - name: Build pinned deployment tools
+        run: docker compose -f compose/compose.tools.yaml build deployment-tools
+
+      - name: Run standalone deployment conformance tests
+        run: |
+          docker compose -f compose/compose.tools.yaml run --rm deployment-tools \
+            -m unittest -v \
+            tests.test_candidate_topology \
+            tests.test_compose_security \
+            tests.test_contract_docs \
+            tests.test_evidence_closure \
+            tests.test_final_candidate \
+            tests.test_kurtosis \
+            tests.test_oci_registry \
+            tests.test_openapi_merge \
+            tests.test_openapi_replay \
+            tests.test_operator_docs \
+            tests.test_production_compose \
+            tests.test_promotion_controller \
+            tests.test_record_gate \
+            tests.test_runbooks \
+            tests.test_soak
